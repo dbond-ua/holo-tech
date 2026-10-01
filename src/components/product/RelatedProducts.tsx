@@ -9,9 +9,9 @@ export function RelatedProducts({ products }: { products: BaseProduct[] }) {
   const { dict } = useI18n();
   if (products.length === 0) return null;
   return (
-    <section className="py-14 sm:py-20">
+    <section className="pt-16 sm:pt-24">
       <SectionHeading eyebrow={dict.product.relatedEyebrow} title={dict.product.relatedTitle} />
-      <ProductGrid products={products} className="mt-8" />
+      <ProductGrid products={products} columns="wide" className="mt-8 sm:mt-10" />
     </section>
   );
 }

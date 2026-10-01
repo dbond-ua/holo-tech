@@ -15,32 +15,25 @@ export function Tabs({ items, defaultKey }: { items: TabItem[]; defaultKey?: str
 
   return (
     <div>
-      <div
-        role="tablist"
-        aria-label="Информация о товаре"
-        className="no-scrollbar flex gap-1 overflow-x-auto border-b border-line dark:border-line-dark"
-      >
+      <div role="tablist" className="no-scrollbar flex gap-6 overflow-x-auto border-b border-rule">
         {items.map((item) => (
           <button
             key={item.key}
+            type="button"
             role="tab"
             aria-selected={active === item.key}
             onClick={() => setActive(item.key)}
             className={cn(
-              "relative shrink-0 px-4 py-3 text-sm font-medium transition-colors",
-              active === item.key
-                ? "text-ink dark:text-ink-dark"
-                : "text-muted hover:text-ink dark:text-muted-dark dark:hover:text-ink-dark"
+              "relative shrink-0 py-3 text-sm font-medium transition-colors",
+              active === item.key ? "text-fg" : "text-fg-2 hover:text-fg"
             )}
           >
             {item.label}
-            {active === item.key && (
-              <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-ink dark:bg-ink-dark" />
-            )}
+            {active === item.key && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-fg" />}
           </button>
         ))}
       </div>
-      <div role="tabpanel" className="animate-fade-in py-6">
+      <div role="tabpanel" className="py-6">
         {activeItem?.content}
       </div>
     </div>

@@ -42,7 +42,7 @@ export default async function InvertersPage({ params }: { params: { locale: Loca
   return (
     <>
       <CategoryHero category={category} count={products.length} dict={dict} />
-      <Container className="py-8 sm:py-10">
+      <Container className="pb-8">
         <CatalogClient category="inverters" products={products} />
       </Container>
     </>

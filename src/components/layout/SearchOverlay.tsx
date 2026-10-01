@@ -6,8 +6,9 @@ import { Search, X, ArrowRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import { allProducts, categorySlugs, brandLogos } from "@/lib/data";
 import { useI18n } from "@/i18n/I18nProvider";
-import { ProductVisual } from "@/components/ui/ProductVisual";
-import { PriceTag } from "@/components/ui/PriceTag";
+import { ProductImage } from "@/components/ui/ProductVisual";
+import { getSpecLine } from "@/lib/product-ui";
+import { formatUAH } from "@/lib/utils";
 
 export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { dict, locale } = useI18n();
@@ -20,7 +21,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   useEffect(() => {
     if (open) {
       setQuery("");
-      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      const t = setTimeout(() => inputRef.current?.focus(), 30);
       const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
       document.addEventListener("keydown", onKey);
       const prevOverflow = document.body.style.overflow;
@@ -39,13 +40,20 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   );
 
   const q = query.trim().toLowerCase();
+  // "2000", "2000 вт", "1024wh" — match power or capacity by number too.
+  const qNumber = Number((q.match(/\d+/) ?? [""])[0]) || null;
 
   const productResults = useMemo(() => {
     if (!q) return [];
     return allProducts
-      .filter((p) => p.name[locale].toLowerCase().includes(q) || p.brand.toLowerCase().includes(q))
+      .filter(
+        (p) =>
+          p.name[locale].toLowerCase().includes(q) ||
+          p.brand.toLowerCase().includes(q) ||
+          (qNumber !== null && (p.powerW === qNumber || p.capacityWh === qNumber))
+      )
       .slice(0, 6);
-  }, [q, locale]);
+  }, [q, qNumber, locale]);
 
   const categoryResults = useMemo(() => {
     if (!q) return [];
@@ -63,110 +71,108 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
 
   return createPortal(
     <div className="fixed inset-0 z-[110]" role="dialog" aria-modal="true" aria-label={dict.header.search}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
-      <div className="absolute inset-x-0 top-0 max-h-[85vh] overflow-y-auto rounded-b-2xl bg-surface shadow-lift animate-slide-down dark:bg-surface-dark">
-        <div className="mx-auto max-w-3xl px-4 pt-6 sm:px-6">
-          <div className="flex items-center gap-3 rounded-full border border-line px-4 py-3 dark:border-line-dark">
-            <Search className="h-5 w-5 shrink-0 text-muted dark:text-muted-dark" />
+      <div className="anim-fade absolute inset-0 bg-[rgb(12_12_11/0.45)]" onClick={onClose} />
+      <div className="anim-drop absolute inset-x-0 top-0 max-h-[90dvh] overflow-y-auto border-b border-rule bg-paper shadow-overlay">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <div className="flex h-16 items-center gap-3 border-b border-fg sm:h-20">
+            <Search className="h-5 w-5 shrink-0 text-fg-2" strokeWidth={1.5} />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={dict.search.placeholder}
-              className="w-full bg-transparent text-base outline-none placeholder:text-muted dark:placeholder:text-muted-dark"
+              placeholder={dict.ui.searchPlaceholder}
+              className="w-full bg-transparent text-lg outline-none placeholder:text-fg-3 sm:text-xl"
               aria-label={dict.header.search}
             />
             <button
+              type="button"
               onClick={onClose}
               aria-label={dict.common.close}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/[0.05] dark:hover:bg-white/10"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-fg-2 transition-colors hover:text-fg"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" strokeWidth={1.5} />
             </button>
           </div>
 
           <div className="pb-10 pt-6">
             {!q && (
               <div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted dark:text-muted-dark">
-                  {dict.search.popularCategories}
-                </p>
-                <div className="flex flex-wrap gap-2">
+                <p className="caption mb-3 text-fg-2">{dict.search.popularCategories}</p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2">
                   {categories.map((c) => (
-                    <Link
-                      key={c.slug}
-                      href={`/${c.slug}`}
-                      onClick={onClose}
-                      className="rounded-full border border-line px-4 py-2 text-sm transition-colors hover:bg-black/[0.03] dark:border-line-dark dark:hover:bg-white/[0.06]"
-                    >
-                      {c.emoji} {c.title}
-                    </Link>
+                    <li key={c.slug}>
+                      <Link
+                        href={`/${c.slug}`}
+                        onClick={onClose}
+                        className="flex items-center justify-between border-b border-rule py-3 text-[15px] transition-colors hover:text-fg-2 sm:mr-6"
+                      >
+                        {c.title}
+                        <ArrowRight className="h-4 w-4 text-fg-3" strokeWidth={1.5} />
+                      </Link>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
-            {q && !hasResults && (
-              <p className="py-8 text-center text-muted dark:text-muted-dark">{dict.search.noResults(query)}</p>
-            )}
+            {q && !hasResults && <p className="py-8 text-fg-2">{dict.search.noResults(query)}</p>}
 
             {productResults.length > 0 && (
-              <div className="mb-6">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted dark:text-muted-dark">
-                  {dict.search.productsLabel}
-                </p>
-                <div className="flex flex-col gap-1">
+              <div className="mb-8">
+                <p className="caption mb-2 text-fg-2">{dict.search.productsLabel}</p>
+                <ul>
                   {productResults.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/${p.category}/${p.slug}`}
-                      onClick={onClose}
-                      className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
-                    >
-                      <ProductVisual category={p.category} seed={p.id} compact className="h-12 w-12 shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{p.name[locale]}</p>
-                        <p className="truncate text-xs text-muted dark:text-muted-dark">{p.brand}</p>
-                      </div>
-                      <PriceTag price={p.price} size="sm" />
-                    </Link>
+                    <li key={p.id}>
+                      <Link
+                        href={`/${p.category}/${p.slug}`}
+                        onClick={onClose}
+                        className="flex items-center gap-4 border-b border-rule py-2.5 transition-colors hover:bg-fg/[0.03]"
+                      >
+                        <ProductImage
+                          src={p.imageUrls?.[0]}
+                          alt=""
+                          category={p.category}
+                          compact
+                          className="h-14 w-16 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-medium">{p.name[locale]}</p>
+                          <p className="spec truncate text-fg-2">{getSpecLine(p, dict).join(" · ") || p.brand}</p>
+                        </div>
+                        <span className="num shrink-0 text-[15px] font-semibold">{formatUAH(p.price)}</span>
+                      </Link>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
             {categoryResults.length > 0 && (
-              <div className="mb-6">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted dark:text-muted-dark">
-                  {dict.search.categoriesLabel}
-                </p>
-                <div className="flex flex-col gap-1">
+              <div className="mb-8">
+                <p className="caption mb-2 text-fg-2">{dict.search.categoriesLabel}</p>
+                <ul>
                   {categoryResults.map((c) => (
-                    <Link
-                      key={c.slug}
-                      href={`/${c.slug}`}
-                      onClick={onClose}
-                      className="flex items-center justify-between rounded-xl px-2 py-2 text-sm transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.06]"
-                    >
-                      <span>{c.emoji} {c.title}</span>
-                      <ArrowRight className="h-4 w-4 text-muted dark:text-muted-dark" />
-                    </Link>
+                    <li key={c.slug}>
+                      <Link
+                        href={`/${c.slug}`}
+                        onClick={onClose}
+                        className="flex items-center justify-between border-b border-rule py-3 text-[15px]"
+                      >
+                        {c.title}
+                        <ArrowRight className="h-4 w-4 text-fg-3" strokeWidth={1.5} />
+                      </Link>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
             {brandResults.length > 0 && (
               <div>
-                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted dark:text-muted-dark">
-                  {dict.search.brandsLabel}
-                </p>
+                <p className="caption mb-3 text-fg-2">{dict.search.brandsLabel}</p>
                 <div className="flex flex-wrap gap-2">
                   {brandResults.map((b) => (
-                    <span
-                      key={b}
-                      className="rounded-full border border-line px-4 py-2 text-sm dark:border-line-dark"
-                    >
+                    <span key={b} className="rounded-sm border border-rule px-3 py-1.5 text-sm">
                       {b}
                     </span>
                   ))}

@@ -1,19 +1,16 @@
 import type { SpecEntry } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-export function SpecsTable({ specs }: { specs: SpecEntry[] }) {
+/** Spec sheet: label / value rows on hairlines; two columns on wide screens. */
+export function SpecsTable({ specs, columns = 2 }: { specs: SpecEntry[]; columns?: 1 | 2 }) {
   return (
-    <div className="overflow-hidden rounded-xl2 border border-line dark:border-line-dark">
-      {specs.map((s, i) => (
-        <div
-          key={s.label}
-          className={`flex flex-col gap-1 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-6 ${
-            i % 2 === 1 ? "bg-black/[0.02] dark:bg-white/[0.03]" : ""
-          }`}
-        >
-          <span className="text-muted dark:text-muted-dark">{s.label}</span>
-          <span className="font-medium">{s.value}</span>
+    <dl className={cn("grid grid-cols-1 border-t border-rule", columns === 2 && "md:grid-cols-2 md:gap-x-10")}>
+      {specs.map((s) => (
+        <div key={s.label} className="flex items-baseline justify-between gap-6 border-b border-rule py-3 text-[15px]">
+          <dt className="text-fg-2">{s.label}</dt>
+          <dd className="num text-right font-medium">{s.value}</dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }

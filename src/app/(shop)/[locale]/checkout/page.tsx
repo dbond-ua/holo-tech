@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Store, Package, Truck } from "lucide-react";
 import { useStore } from "@/context/CartContext";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import { Container } from "@/components/ui/Container";
-import { Button, buttonVariants } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useActionBar } from "@/components/ui/useActionBar";
+import { ProductVisual } from "@/components/ui/ProductVisual";
 import { PhoneInput } from "@/components/checkout/PhoneInput";
 import { Combobox, type ComboboxItem } from "@/components/checkout/Combobox";
 import { formatUAH, cn } from "@/lib/utils";
@@ -17,8 +19,8 @@ import { localePath } from "@/i18n/localePath";
 import type { DeliveryMethod } from "@/lib/db/types";
 
 const inputClass =
-  "w-full rounded-xl2 border border-line bg-transparent px-4 py-3 text-sm outline-none transition-colors focus-visible:border-ink dark:border-line-dark dark:focus-visible:border-white disabled:opacity-50";
-const labelClass = "mb-1.5 block text-sm font-medium";
+  "h-12 w-full rounded-sm border border-rule bg-panel px-3.5 text-[15px] outline-none transition-colors placeholder:text-fg-3 focus:border-fg disabled:opacity-50";
+const labelClass = "mb-1.5 block text-sm text-fg-2";
 
 interface NpCity {
   ref: string;
@@ -81,6 +83,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const cityDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useActionBar();
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -252,20 +255,19 @@ export default function CheckoutPage() {
 
   if (hydrated && cart.length === 0) {
     return (
-      <Container className="flex flex-col items-center justify-center py-24 text-center">
-        <h1 className="text-xl font-semibold">{dict.checkout.emptyTitle}</h1>
-        <p className="mt-2 text-sm text-muted dark:text-muted-dark">{dict.checkout.emptyText}</p>
-        <Link href="/stations" className={buttonVariants({ className: "mt-6" })}>
-          {dict.cart.goToCatalog}
-        </Link>
+      <Container className="pt-6 sm:pt-10">
+        <h1 className="mb-6 text-[34px] font-semibold leading-none tracking-[-0.03em] sm:mb-10 sm:text-h1">
+          {dict.checkout.title}
+        </h1>
+        <EmptyState title={dict.checkout.emptyTitle} text={dict.checkout.emptyText} lead={dict.ui.emptyCartLead} />
       </Container>
     );
   }
 
-  const deliveryOptions: { key: DeliveryMethod; label: string; icon: typeof Store }[] = [
-    { key: "np_warehouse", label: dict.checkout.methodNpWarehouse, icon: Store },
-    { key: "np_poshtomat", label: dict.checkout.methodNpPoshtomat, icon: Package },
-    { key: "courier", label: dict.checkout.methodCourier, icon: Truck },
+  const deliveryOptions: { key: DeliveryMethod; label: string }[] = [
+    { key: "np_warehouse", label: dict.checkout.methodNpWarehouse },
+    { key: "np_poshtomat", label: dict.checkout.methodNpPoshtomat },
+    { key: "courier", label: dict.checkout.methodCourier },
   ];
 
   const cityComboboxItems: ComboboxItem[] = cityResults.map((c) => ({
@@ -274,75 +276,99 @@ export default function CheckoutPage() {
     sublabel: c.area,
   }));
 
+  const step = (n: number, title: string) => (
+    <h2 className="flex items-baseline gap-4 text-h3 font-semibold">
+      <span className="spec text-fg-3">{dict.ui.stepIndex(n)}</span>
+      {title}
+    </h2>
+  );
+
+  const submitButton = (className?: string) => (
+    <Button size="lg" disabled={!isValid || submitting} onClick={handleSubmit} className={className}>
+      {submitting ? dict.checkout.submitting : dict.checkout.confirmBtn}
+    </Button>
+  );
+
   return (
-    <Container className="py-10 sm:py-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{dict.checkout.title}</h1>
+    <Container className="pt-6 sm:pt-10">
+      <h1 className="mb-6 text-[34px] font-semibold leading-none tracking-[-0.03em] sm:mb-10 sm:text-h1">
+        {dict.checkout.title}
+      </h1>
 
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_360px]">
-        <div className="flex flex-col gap-6 rounded-xl2 border border-line p-6 dark:border-line-dark">
-          <div className="flex flex-col gap-4">
-            <h2 className="text-base font-semibold">{dict.checkout.contactsTitle}</h2>
-            <div>
-              <label className={labelClass} htmlFor="name">
-                {dict.checkout.nameLabel}
-              </label>
-              <input
-                id="name"
-                className={inputClass}
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-                placeholder={dict.checkout.namePlaceholder}
-                autoComplete="name"
-              />
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+        <div className="flex flex-col lg:col-span-7">
+          <section className="border-t border-fg py-6 sm:py-8">
+            {step(1, dict.checkout.contactsTitle)}
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass} htmlFor="name">
+                  {dict.checkout.nameLabel}
+                </label>
+                <input
+                  id="name"
+                  className={inputClass}
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  placeholder={dict.checkout.namePlaceholder}
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="phone">
+                  {dict.checkout.phoneLabel}
+                </label>
+                <PhoneInput
+                  id="phone"
+                  value={form.phoneLocal}
+                  onChange={(digits) => update("phoneLocal", digits)}
+                  onBlur={() => setPhoneTouched(true)}
+                  placeholder={dict.checkout.phonePlaceholder}
+                  invalid={phoneInvalid}
+                />
+                {phoneInvalid && (
+                  <p className="mt-1.5 text-[13px] text-signal-text">
+                    {phoneResult.error === "invalid_prefix" ? dict.checkout.phoneErrorPrefix : dict.checkout.phoneErrorIncomplete}
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <label className={labelClass} htmlFor="phone">
-                {dict.checkout.phoneLabel}
-              </label>
-              <PhoneInput
-                id="phone"
-                value={form.phoneLocal}
-                onChange={(digits) => update("phoneLocal", digits)}
-                onBlur={() => setPhoneTouched(true)}
-                placeholder={dict.checkout.phonePlaceholder}
-                invalid={phoneInvalid}
-              />
-              {phoneInvalid && (
-                <p className="mt-1.5 text-xs text-ember">
-                  {phoneResult.error === "invalid_prefix" ? dict.checkout.phoneErrorPrefix : dict.checkout.phoneErrorIncomplete}
-                </p>
-              )}
-            </div>
-          </div>
+          </section>
 
-          <div className="flex flex-col gap-4 border-t border-line pt-6 dark:border-line-dark">
-            <h2 className="text-base font-semibold">{dict.checkout.deliveryTitle}</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {deliveryOptions.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  onClick={() => {
-                    update("deliveryMethod", m.key);
-                    update("npWarehouseRef", "");
-                    update("npWarehouseName", "");
-                    update("warehouseQuery", "");
-                  }}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl2 border p-3.5 text-left text-sm font-medium transition-all",
-                    form.deliveryMethod === m.key
-                      ? "border-ink bg-black/[0.03] dark:border-white dark:bg-white/[0.06]"
-                      : "border-line dark:border-line-dark"
-                  )}
-                >
-                  <m.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.6} />
-                  {m.label}
-                </button>
-              ))}
+          <section className="border-t border-rule py-6 sm:py-8">
+            {step(2, dict.checkout.deliveryTitle)}
+            <div className="mt-6 border-t border-rule" role="radiogroup" aria-label={dict.checkout.deliveryTitle}>
+              {deliveryOptions.map((m) => {
+                const selected = form.deliveryMethod === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      update("deliveryMethod", m.key);
+                      update("npWarehouseRef", "");
+                      update("npWarehouseName", "");
+                      update("warehouseQuery", "");
+                    }}
+                    className="flex h-14 w-full items-center gap-3 border-b border-rule text-left text-[15px] transition-colors hover:bg-fg/[0.03]"
+                  >
+                    <span
+                      className={cn(
+                        "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border",
+                        selected ? "border-fg" : "border-fg-3"
+                      )}
+                    >
+                      {selected && <span className="h-2.5 w-2.5 rounded-full bg-fg" />}
+                    </span>
+                    <span className={selected ? "font-medium" : ""}>{m.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {isNovaPoshta ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={labelClass} htmlFor="city">
                     {dict.checkout.cityLabel}
@@ -378,7 +404,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
             ) : (
-              <div>
+              <div className="mt-6">
                 <label className={labelClass} htmlFor="address">
                   {dict.checkout.addressLabel}
                 </label>
@@ -391,45 +417,62 @@ export default function CheckoutPage() {
                 />
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="border-t border-line pt-6 dark:border-line-dark">
-            <label className={labelClass} htmlFor="comment">
-              {dict.checkout.commentLabel}
-            </label>
+          <section className="border-t border-rule py-6 sm:py-8">
+            {step(3, dict.checkout.commentLabel)}
             <textarea
               id="comment"
+              aria-label={dict.checkout.commentLabel}
               rows={3}
-              className={cn(inputClass, "resize-none")}
+              className={cn(inputClass, "mt-6 h-auto resize-none py-3")}
               value={form.comment}
               onChange={(e) => update("comment", e.target.value)}
               placeholder={dict.checkout.commentPlaceholder}
             />
-          </div>
+          </section>
 
-          {submitError && <p className="text-sm text-ember">{submitError}</p>}
-
-          <Button size="lg" disabled={!isValid || submitting} onClick={handleSubmit}>
-            {submitting ? dict.checkout.submitting : dict.checkout.confirmBtn}
-          </Button>
+          {submitError && <p className="pb-4 text-sm text-signal-text">{submitError}</p>}
+          <div className="hidden border-t border-rule pt-6 lg:block">{submitButton("w-full")}</div>
         </div>
 
-        <div className="h-fit rounded-xl2 border border-line p-6 dark:border-line-dark">
-          <h2 className="text-base font-semibold">{dict.checkout.yourOrderTitle}</h2>
-          <div className="mt-4 flex flex-col gap-2.5 text-sm">
-            {cart.map((item) => (
-              <div key={item.id} className="flex justify-between gap-3">
-                <span className="text-muted dark:text-muted-dark">
-                  {item.name[locale]} × {item.qty}
-                </span>
-                <span className="shrink-0 font-medium">{formatUAH(item.price * item.qty)}</span>
+        <aside className="lg:col-span-5 lg:col-start-8">
+          <div className="border-t border-fg lg:sticky lg:top-[8.5rem]">
+            <h2 className="py-4 text-base font-semibold">{dict.checkout.yourOrderTitle}</h2>
+            <ul className="border-t border-rule">
+              {cart.map((item) => (
+                <li key={item.id} className="flex items-center gap-3 border-b border-rule py-3">
+                  <ProductVisual category={item.category} compact className="h-14 w-16 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-sm font-medium leading-snug">{item.name[locale]}</p>
+                    <p className="num text-[13px] text-fg-2">
+                      {item.qty} × {formatUAH(item.price)}
+                    </p>
+                  </div>
+                  <span className="num shrink-0 text-sm font-medium">{formatUAH(item.price * item.qty)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="text-[15px]">
+              <div className="flex justify-between gap-4 border-b border-rule py-3">
+                <dt className="text-fg-2">{dict.cart.shippingLabel}</dt>
+                <dd className="text-right">{dict.ui.shippingCarrier}</dd>
               </div>
-            ))}
+              <div className="flex items-baseline justify-between py-4">
+                <dt className="font-semibold">{dict.cart.itemsLabel(cartCount)}</dt>
+                <dd className="num text-[28px] font-semibold tracking-[-0.02em]">{formatUAH(cartTotal)}</dd>
+              </div>
+            </dl>
+            <p className="text-[13px] text-fg-2">{dict.ui.shippingNote}</p>
           </div>
-          <div className="mt-4 flex items-center justify-between border-t border-line pt-4 dark:border-line-dark">
-            <span className="font-semibold">{dict.cart.itemsLabel(cartCount)}</span>
-            <span className="text-xl font-semibold tracking-tight">{formatUAH(cartTotal)}</span>
-          </div>
+        </aside>
+      </div>
+
+      {/* Mobile sticky submit */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+        <div className="flex items-center gap-4">
+          <p className="num shrink-0 text-lg font-semibold">{formatUAH(cartTotal)}</p>
+          {submitButton("flex-1")}
         </div>
       </div>
     </Container>

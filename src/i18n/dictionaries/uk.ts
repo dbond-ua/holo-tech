@@ -1,5 +1,13 @@
 import type { Dictionary } from "../dictionary.types";
 
+function ukPlural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
 export const uk: Dictionary = {
   meta: {
     siteName: "HoloTech",
@@ -388,5 +396,63 @@ export const uk: Dictionary = {
     rightsReserved: "HoloTech. Демонстраційний інтернет-магазин.",
     demoNotice: "Ціни, наявність і частина характеристик наведені в демонстраційних цілях.",
     contactManagerTelegram: "Написати в Telegram",
+  },
+  ui: {
+    topbarDelivery: "Доставка Новою поштою по всій Україні",
+    topbarService: "Підключення інверторів і налаштування систем",
+    searchPlaceholder: "Станція, інвертор, бренд або потужність",
+    menu: "Меню",
+    megaAll: "Перейти до розділу",
+    megaQuiz: "Підбір станції",
+    megaQuizText: "Три запитання — і ми покажемо моделі, що підходять саме вам.",
+    tabQuiz: "Підбір",
+    heroTitle: "Світло вимикають.\nВаш дім працює далі.",
+    heroLead: "Зарядні станції, інвертори та акумуляторні системи для дому, бізнесу та подорожей.",
+    heroCta: "Детальніше",
+    heroAll: "Усі станції",
+    heroQuiz: "Підібрати станцію",
+    modelsCount: (n) => `${n} ${ukPlural(n, "модель", "моделі", "моделей")}`,
+    productsCount: (n) => `${n} ${ukPlural(n, "товар", "товари", "товарів")}`,
+    categoryOpen: "Відкрити",
+    quizLead:
+      "Оберіть, що потрібно живити і як довго. Ми порахуємо потрібну ємність і покажемо станції з каталогу, які її мають.",
+    quizNeed: "Потрібна ємність",
+    quizStep: (c, t) => `${String(c).padStart(2, "0")} / ${String(t).padStart(2, "0")}`,
+    picksEyebrow: "Вітрина",
+    picksTitle: "Вибір HoloTech",
+    picksDescription: "Моделі, які ми радимо для дому та подорожей",
+    solutionsColTier: "Рівень",
+    solutionsColFor: "Що живить",
+    solutionsColPower: "Потужність",
+    solutionsColCapacity: "Ємність",
+    solutionsColAutonomy: "Автономність",
+    solutionsColPrice: "Ціна",
+    solutionsRecommended: "Радимо",
+    serviceEyebrow: "Сервіс",
+    addedToCart: "Додано в кошик",
+    continueShopping: "Продовжити покупки",
+    goToCart: "Перейти в кошик",
+    viewGrid: "Сітка",
+    viewList: "Список",
+    sortLabel: "Сортування",
+    resetAll: "Скинути все",
+    priceFrom: "від",
+    priceTo: "до",
+    upTo: "до",
+    showFilters: (n) => (n > 0 ? `Фільтри · ${n}` : "Фільтри"),
+    keySpecs: "Ключові характеристики",
+    allSpecs: "Усі характеристики",
+    featuresTitle: "Особливості",
+    deliveryAndWarranty: "Доставка і гарантія",
+    orderBy: "Замовлення",
+    shippingCarrier: "за тарифами перевізника",
+    shippingNote: "Вартість доставки Новою поштою розраховується за тарифами перевізника.",
+    havePromo: "Маю промокод",
+    emptyCartLead: "Почніть з розділу каталогу:",
+    emptyFavoritesLead: "Почніть з розділу каталогу:",
+    stepIndex: (n) => String(n).padStart(2, "0"),
+    orderSummary: "Ваше замовлення",
+    lowStock: (n) => `Залишилось ${n} шт.`,
+    pieces: "шт.",
   },
 };

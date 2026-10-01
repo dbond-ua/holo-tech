@@ -23,28 +23,21 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const pathname = usePathname();
 
   return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-0.5 rounded-full border border-line p-0.5 text-xs font-semibold dark:border-line-dark",
-        className
-      )}
-      role="group"
-      aria-label="Language / Мова"
-    >
-      {locales.map((l) => (
-        <Link
-          key={l}
-          href={pathForLocale(pathname, l)}
-          aria-current={l === locale ? "true" : undefined}
-          className={cn(
-            "rounded-full px-2.5 py-1 transition-colors",
-            l === locale
-              ? "bg-ink text-white dark:bg-white dark:text-ink"
-              : "text-muted hover:text-ink dark:text-muted-dark dark:hover:text-ink-dark"
-          )}
-        >
-          {localeNames[l]}
-        </Link>
+    <div className={cn("inline-flex items-center gap-1.5", className)} role="group" aria-label="Language / Мова">
+      {locales.map((l, i) => (
+        <span key={l} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className="text-fg-3" aria-hidden="true">/</span>}
+          <Link
+            href={pathForLocale(pathname, l)}
+            aria-current={l === locale ? "true" : undefined}
+            className={cn(
+              "transition-colors",
+              l === locale ? "font-medium text-fg" : "text-fg-2 hover:text-fg"
+            )}
+          >
+            {localeNames[l]}
+          </Link>
+        </span>
       ))}
     </div>
   );
