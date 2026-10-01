@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+build
+
+# Secrets — never commit real credentials (DATABASE_URL, Telegram bot token,
+# Nova Poshta API key, session/bootstrap secrets). Commit .env.example only.
+.env
+.env.*
+!.env.example
+
+# Local product-photo storage (PRODUCT_IMAGES_DIR default) — real uploaded
+# files live on the VPS disk only, never in git.
+/storage
+
+.DS_Store
+*.log
