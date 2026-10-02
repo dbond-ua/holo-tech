@@ -21,8 +21,10 @@ export default function FavoritesPage({ params }: { params: { locale: Locale } }
   const dict = getDictionary(params.locale);
 
   return (
-    <Container className="py-10 sm:py-14">
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{dict.favorites.title}</h1>
+    <Container className="pt-6 sm:pt-10">
+      <h1 className="mb-6 text-[34px] font-semibold leading-none tracking-[-0.03em] sm:mb-10 sm:text-h1">
+        {dict.favorites.title}
+      </h1>
       <FavoritesClient />
     </Container>
   );

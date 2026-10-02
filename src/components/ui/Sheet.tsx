@@ -7,12 +7,17 @@ import { cn } from "@/lib/utils";
 
 type Side = "left" | "right" | "bottom";
 
+/**
+ * Modal side panel / bottom sheet. Square-edged panels with a hairline
+ * header; slides in from its edge (240ms), backdrop fades.
+ */
 export function Sheet({
   open,
   onClose,
   side = "right",
   title,
   children,
+  footer,
   widthClassName,
 }: {
   open: boolean;
@@ -20,6 +25,7 @@ export function Sheet({
   side?: Side;
   title?: string;
   children: ReactNode;
+  footer?: ReactNode;
   widthClassName?: string;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -44,39 +50,34 @@ export function Sheet({
 
   const panelPosition =
     side === "left"
-      ? "left-0 top-0 h-full animate-[slide-up_0.01s] "
+      ? "left-0 top-0 h-full anim-drawer-left"
       : side === "right"
-      ? "right-0 top-0 h-full"
-      : "left-0 right-0 bottom-0 rounded-t-2xl max-h-[85vh]";
+      ? "right-0 top-0 h-full anim-drawer-right"
+      : "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-md anim-sheet-up";
 
-  const panelWidth =
-    side === "bottom" ? "w-full" : widthClassName ?? "w-full max-w-md";
+  const panelWidth = side === "bottom" ? "w-full" : widthClassName ?? "w-full max-w-md";
 
   return createPortal(
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={title}>
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-fade-in"
-        onClick={onClose}
-      />
-      <div
-        className={cn(
-          "absolute flex flex-col bg-surface shadow-lift dark:bg-surface-dark",
-          panelPosition,
-          panelWidth,
-          side === "bottom" ? "animate-slide-up" : "animate-fade-in"
-        )}
-      >
-        <div className="flex items-center justify-between border-b border-line px-5 py-4 dark:border-line-dark">
-          <h2 className="text-base font-semibold">{title}</h2>
+      <div className="anim-fade absolute inset-0 bg-[rgb(12_12_11/0.45)]" onClick={onClose} />
+      <div className={cn("absolute flex flex-col bg-paper text-fg shadow-overlay", panelPosition, panelWidth)}>
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-rule pl-5 pr-2">
+          <h2 className="text-[15px] font-semibold">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
-            aria-label="Закрыть"
-            className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-black/[0.05] dark:hover:bg-white/10"
+            aria-label="Закрити"
+            className="flex h-10 w-10 items-center justify-center rounded-md text-fg-2 transition-colors hover:text-fg"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={1.5} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-rule bg-paper p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

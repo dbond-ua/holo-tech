@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { stations } from "@/lib/data";
 import { Container } from "@/components/ui/Container";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ProductVisual } from "@/components/ui/ProductVisual";
 import { CompareTable } from "@/components/compare/CompareTable";
 import { formatUAH, cn } from "@/lib/utils";
@@ -31,46 +30,40 @@ export default function ComparePage() {
   const selectedProducts = stations.filter((s) => selected.includes(s.id));
 
   return (
-    <Container className="py-10 sm:py-14">
-      <SectionHeading
-        title={dict.compare.title}
-        description={dict.compare.description(MAX_COMPARE)}
-        as="h1"
-      />
+    <Container className="pt-6 sm:pt-10">
+      <h1 className="text-[34px] font-semibold leading-none tracking-[-0.03em] sm:text-h1">{dict.compare.title}</h1>
+      <p className="mt-3 text-fg-2 sm:text-lg">{dict.compare.description(MAX_COMPARE)}</p>
 
-      <div className="mt-8 flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+      <ul className="no-scrollbar -mx-4 mt-8 flex overflow-x-auto border-y border-rule px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:border-l lg:px-0">
         {stations.map((s) => {
           const active = selected.includes(s.id);
           const disabled = !active && selected.length >= MAX_COMPARE;
           return (
-            <button
-              key={s.id}
-              onClick={() => toggle(s.id)}
-              disabled={disabled}
-              className={cn(
-                "flex w-44 shrink-0 flex-col items-start gap-2 rounded-xl2 border p-3 text-left transition-all",
-                active
-                  ? "border-ink bg-black/[0.03] dark:border-white dark:bg-white/[0.06]"
-                  : "border-line dark:border-line-dark",
-                disabled && "opacity-40"
-              )}
-            >
-              <div className="relative w-full">
-                <ProductVisual category="stations" seed={s.id} compact className="aspect-square w-full" />
-                {active && (
-                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink text-white dark:bg-white dark:text-ink">
-                    <Check className="h-3 w-3" />
-                  </span>
+            <li key={s.id} className="shrink-0 border-r border-rule first:border-l lg:first:border-l-0">
+              <button
+                type="button"
+                onClick={() => toggle(s.id)}
+                disabled={disabled}
+                aria-pressed={active}
+                className={cn(
+                  "flex w-40 flex-col items-start gap-2 p-3 text-left transition-colors",
+                  active ? "bg-fg text-paper" : "hover:bg-fg/[0.04]",
+                  disabled && "opacity-40"
                 )}
-              </div>
-              <p className="line-clamp-2 text-xs font-medium">{s.name[locale]}</p>
-              <p className="text-xs text-muted dark:text-muted-dark">{formatUAH(s.price)}</p>
-            </button>
+              >
+                <ProductVisual category="stations" compact className="aspect-[4/3] w-full" />
+                <p className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-tight">{s.name[locale]}</p>
+                <p className={cn("num flex w-full items-center justify-between text-[13px]", active ? "text-paper/70" : "text-fg-2")}>
+                  {formatUAH(s.price)}
+                  {active && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+                </p>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
 
-      <div className="mt-8">
+      <div className="mt-10">
         <CompareTable products={selectedProducts} onRemove={toggle} />
       </div>
     </Container>

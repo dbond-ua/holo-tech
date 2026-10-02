@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { SlidersHorizontal, X } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
 import type { BaseProduct, CategorySlug } from "@/lib/types";
-import { powerBuckets, capacityBuckets, inBucket, sortOptions, type SortKey } from "@/lib/filters";
+import { powerBuckets, capacityBuckets, inBucket, sortOptions, type Bucket, type SortKey } from "@/lib/filters";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { PriceRangeSlider } from "@/components/ui/PriceRangeSlider";
 import { Sheet } from "@/components/ui/Sheet";
-import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,19 @@ const stationToggles: QuickToggle[] = [
   { key: "wifi", labelKey: "wifiToggle" },
 ];
 
+type FilterGroup = "brand" | "power" | "capacity" | "toggle" | "phase" | "mppt" | "type" | "price";
+const VIEW_STORAGE_KEY = "holotech:catalog-view";
+
+/**
+ * Catalog: sticky filter column (desktop) / filter sheet (mobile), toolbar
+ * with count, sort and grid/list toggle, removable chips for active filters.
+ * Option counts are facet counts — how many products the option would show
+ * given every *other* active filter — and options that would give zero
+ * results are dimmed.
+ *
+ * Filtering logic is the same as before; `?brand=` in the URL (used by the
+ * header mega-menu) preselects a brand.
+ */
 export function CatalogClient({
   category,
   products,
@@ -33,6 +46,7 @@ export function CatalogClient({
   products: BaseProduct[];
 }) {
   const { dict } = useI18n();
+  const u = dict.units;
 
   const sortLabels: Record<SortKey, string> = {
     popular: dict.catalog.sortPopular,
@@ -42,10 +56,10 @@ export function CatalogClient({
     rating: dict.catalog.sortRating,
   };
 
-  const brandsAvailable = useMemo(
-    () => Array.from(new Set(products.map((p) => p.brand))).sort(),
-    [products]
-  );
+  const bucketLabel = (b: Bucket, unit: string) =>
+    b.min === 0 ? `${dict.ui.upTo} ${b.max} ${unit}` : b.max === Infinity ? `${b.min}+ ${unit}` : `${b.min}–${b.max} ${unit}`;
+
+  const brandsAvailable = useMemo(() => Array.from(new Set(products.map((p) => p.brand))).sort(), [products]);
   const priceMin = useMemo(() => Math.min(...products.map((p) => p.price)), [products]);
   const priceMax = useMemo(() => Math.max(...products.map((p) => p.price)), [products]);
   const phasesAvailable = useMemo(
@@ -53,9 +67,10 @@ export function CatalogClient({
     [products]
   );
   const mpptAvailable = useMemo(
-    () => Array.from(new Set(products.map((p) => p.mppt).filter((v): v is number => typeof v === "number"))).sort(
-      (a, b) => a - b
-    ),
+    () =>
+      Array.from(new Set(products.map((p) => p.mppt).filter((v): v is number => typeof v === "number"))).sort(
+        (a, b) => a - b
+      ),
     [products]
   );
   const inverterTypesAvailable = useMemo(
@@ -73,7 +88,29 @@ export function CatalogClient({
   const [mppt, setMppt] = useState<number[]>([]);
   const [inverterType, setInverterType] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("popular");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // ?brand=EcoFlow preselect (from the mega-menu) + remembered view mode.
+  useEffect(() => {
+    const brand = new URLSearchParams(window.location.search).get("brand");
+    if (brand && brandsAvailable.includes(brand as BaseProduct["brand"])) setBrands([brand]);
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === "grid" || saved === "list") setView(saved);
+    } catch {
+      // storage unavailable — keep default
+    }
+  }, [brandsAvailable]);
+
+  function changeView(next: "grid" | "list") {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // ignore
+    }
+  }
 
   const effectivePriceRange: [number, number] = priceTouched ? priceRange : [priceMin, priceMax];
 
@@ -81,38 +118,34 @@ export function CatalogClient({
     setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
 
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      if (brands.length && !brands.includes(p.brand)) return false;
-      if (p.price < effectivePriceRange[0] || p.price > effectivePriceRange[1]) return false;
-
-      if (powerBucketKeys.length) {
-        const matches = powerBuckets
-          .filter((b) => powerBucketKeys.includes(b.key))
-          .some((b) => inBucket(p.powerW, b));
-        if (!matches) return false;
-      }
-
-      if (capacityBucketKeys.length) {
-        const matches = capacityBuckets
-          .filter((b) => capacityBucketKeys.includes(b.key))
-          .some((b) => inBucket(p.capacityWh, b));
-        if (!matches) return false;
-      }
-
+  /** Does `p` pass every active filter, optionally ignoring one group (for facet counts)? */
+  function passes(p: BaseProduct, except?: FilterGroup): boolean {
+    if (except !== "brand" && brands.length && !brands.includes(p.brand)) return false;
+    if (except !== "price" && (p.price < effectivePriceRange[0] || p.price > effectivePriceRange[1])) return false;
+    if (except !== "power" && powerBucketKeys.length) {
+      if (!powerBuckets.filter((b) => powerBucketKeys.includes(b.key)).some((b) => inBucket(p.powerW, b))) return false;
+    }
+    if (except !== "capacity" && capacityBucketKeys.length) {
+      if (!capacityBuckets.filter((b) => capacityBucketKeys.includes(b.key)).some((b) => inBucket(p.capacityWh, b)))
+        return false;
+    }
+    if (except !== "toggle") {
       for (const [key, on] of Object.entries(toggles)) {
         if (on && !(p as unknown as Record<string, unknown>)[key]) return false;
       }
+    }
+    if (except !== "phase" && phase.length && (!p.phase || !phase.includes(p.phase))) return false;
+    if (except !== "mppt" && mppt.length && (p.mppt === undefined || !mppt.includes(p.mppt))) return false;
+    if (except !== "type" && inverterType.length && (!p.inverterType || !inverterType.includes(p.inverterType)))
+      return false;
+    return true;
+  }
 
-      if (phase.length && (!p.phase || !phase.includes(p.phase))) return false;
-      if (mppt.length && (p.mppt === undefined || !mppt.includes(p.mppt))) return false;
-      if (inverterType.length && (!p.inverterType || !inverterType.includes(p.inverterType))) return false;
+  const filtered = products.filter((p) => passes(p));
+  const facet = (group: FilterGroup, test: (p: BaseProduct) => boolean) =>
+    products.filter((p) => passes(p, group) && test(p)).length;
 
-      return true;
-    });
-  }, [products, brands, effectivePriceRange, powerBucketKeys, capacityBucketKeys, toggles, phase, mppt, inverterType]);
-
-  const sorted = useMemo(() => {
+  const sorted = (() => {
     const arr = [...filtered];
     switch (sort) {
       case "new":
@@ -126,7 +159,7 @@ export function CatalogClient({
       default:
         return arr.sort((a, b) => Number(b.isBestseller) - Number(a.isBestseller) || b.reviewsCount - a.reviewsCount);
     }
-  }, [filtered, sort]);
+  })();
 
   const activeFilterCount =
     brands.length +
@@ -150,172 +183,241 @@ export function CatalogClient({
     setInverterType([]);
   }
 
-  const filtersContent = (
-    <div className="flex flex-col gap-7">
-      <div>
-        <p className="mb-3 text-sm font-semibold">{dict.catalog.priceGroup}</p>
+  /* --- Filter UI ------------------------------------------------------- */
+
+  const optionRow = (key: string, label: ReactNode, checked: boolean, count: number, onChange: () => void) => (
+    <label
+      key={key}
+      className={cn(
+        "flex cursor-pointer items-center gap-3 py-1.5 text-[15px] lg:text-sm",
+        !checked && count === 0 && "opacity-40"
+      )}
+    >
+      <input type="checkbox" className="check" checked={checked} onChange={onChange} />
+      <span className="flex-1">{label}</span>
+      <span className="spec text-fg-3">{count}</span>
+    </label>
+  );
+
+  const groups: { key: string; title: string; content: ReactNode; show: boolean }[] = [
+    {
+      key: "price",
+      title: dict.catalog.priceGroup,
+      show: priceMax > priceMin,
+      content: (
         <PriceRangeSlider
           min={priceMin}
           max={priceMax}
           value={effectivePriceRange}
+          labels={{ from: dict.ui.priceFrom, to: dict.ui.priceTo }}
           onChange={(v) => {
             setPriceTouched(true);
             setPriceRange(v);
           }}
         />
-      </div>
+      ),
+    },
+    {
+      key: "brand",
+      title: dict.catalog.brandGroup,
+      show: brandsAvailable.length > 1,
+      content: brandsAvailable.map((b) =>
+        optionRow(b, b, brands.includes(b), facet("brand", (p) => p.brand === b), () => toggle(brands, b, setBrands))
+      ),
+    },
+    {
+      key: "power",
+      title: dict.catalog.powerGroup,
+      show: category === "stations",
+      content: powerBuckets.map((b) =>
+        optionRow(
+          b.key,
+          bucketLabel(b, u.w),
+          powerBucketKeys.includes(b.key),
+          facet("power", (p) => inBucket(p.powerW, b)),
+          () => toggle(powerBucketKeys, b.key, setPowerBucketKeys)
+        )
+      ),
+    },
+    {
+      key: "capacity",
+      title: dict.catalog.capacityGroup,
+      show: category === "stations",
+      content: capacityBuckets.map((b) =>
+        optionRow(
+          b.key,
+          bucketLabel(b, u.wh),
+          capacityBucketKeys.includes(b.key),
+          facet("capacity", (p) => inBucket(p.capacityWh, b)),
+          () => toggle(capacityBucketKeys, b.key, setCapacityBucketKeys)
+        )
+      ),
+    },
+    {
+      key: "toggle",
+      title: dict.catalog.extraGroup,
+      show: category === "stations",
+      content: stationToggles.map((t) =>
+        optionRow(
+          t.key as string,
+          dict.catalog[t.labelKey],
+          !!toggles[t.key as string],
+          facet("toggle", (p) => !!(p as unknown as Record<string, unknown>)[t.key as string]),
+          () => setToggles((prev) => ({ ...prev, [t.key as string]: !prev[t.key as string] }))
+        )
+      ),
+    },
+    {
+      key: "phase",
+      title: dict.catalog.phaseGroup,
+      show: category === "inverters" && phasesAvailable.length > 0,
+      content: phasesAvailable.map((ph) =>
+        optionRow(
+          ph,
+          ph === "single" ? dict.specs.phaseSingle : dict.specs.phaseThree,
+          phase.includes(ph),
+          facet("phase", (p) => p.phase === ph),
+          () => toggle(phase, ph, setPhase)
+        )
+      ),
+    },
+    {
+      key: "mppt",
+      title: dict.catalog.mpptGroup,
+      show: category === "inverters" && mpptAvailable.length > 0,
+      content: mpptAvailable.map((m) =>
+        optionRow(String(m), String(m), mppt.includes(m), facet("mppt", (p) => p.mppt === m), () =>
+          toggle(mppt, m, setMppt)
+        )
+      ),
+    },
+    {
+      key: "type",
+      title: dict.catalog.typeGroup,
+      show: category === "inverters" && inverterTypesAvailable.length > 0,
+      content: inverterTypesAvailable.map((t) =>
+        optionRow(
+          t,
+          t === "hybrid" ? dict.specs.typeHybrid : t === "grid" ? dict.specs.typeGrid : dict.specs.typeOffgrid,
+          inverterType.includes(t),
+          facet("type", (p) => p.inverterType === t),
+          () => toggle(inverterType, t, setInverterType)
+        )
+      ),
+    },
+  ];
 
-      {brandsAvailable.length > 1 && (
-        <div>
-          <p className="mb-3 text-sm font-semibold">{dict.catalog.brandGroup}</p>
-          <div className="flex flex-col gap-2.5">
-            {brandsAvailable.map((b) => (
-              <label key={b} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={brands.includes(b)}
-                  onChange={() => toggle(brands, b, setBrands)}
-                  className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                />
-                {b}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+  const filtersContent = (
+    <div>
+      {groups
+        .filter((g) => g.show)
+        .map((g) => (
+          <FilterSection key={g.key} title={g.title}>
+            {g.content}
+          </FilterSection>
+        ))}
+    </div>
+  );
 
-      {category === "stations" && (
-        <>
-          <div>
-            <p className="mb-3 text-sm font-semibold">{dict.catalog.powerGroup}</p>
-            <div className="flex flex-col gap-2.5">
-              {powerBuckets.map((b) => (
-                <label key={b.key} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={powerBucketKeys.includes(b.key)}
-                    onChange={() => toggle(powerBucketKeys, b.key, setPowerBucketKeys)}
-                    className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                  />
-                  {b.label}
-                </label>
-              ))}
-            </div>
-          </div>
+  /* --- Active chips ---------------------------------------------------- */
 
-          <div>
-            <p className="mb-3 text-sm font-semibold">{dict.catalog.capacityGroup}</p>
-            <div className="flex flex-col gap-2.5">
-              {capacityBuckets.map((b) => (
-                <label key={b.key} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={capacityBucketKeys.includes(b.key)}
-                    onChange={() => toggle(capacityBucketKeys, b.key, setCapacityBucketKeys)}
-                    className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                  />
-                  {b.label}
-                </label>
-              ))}
-            </div>
-          </div>
+  const chips: { key: string; label: string; remove: () => void }[] = [
+    ...brands.map((b) => ({ key: `b-${b}`, label: b, remove: () => toggle(brands, b, setBrands) })),
+    ...powerBucketKeys.map((k) => ({
+      key: `p-${k}`,
+      label: bucketLabel(powerBuckets.find((b) => b.key === k)!, u.w),
+      remove: () => toggle(powerBucketKeys, k, setPowerBucketKeys),
+    })),
+    ...capacityBucketKeys.map((k) => ({
+      key: `c-${k}`,
+      label: bucketLabel(capacityBuckets.find((b) => b.key === k)!, u.wh),
+      remove: () => toggle(capacityBucketKeys, k, setCapacityBucketKeys),
+    })),
+    ...stationToggles
+      .filter((t) => toggles[t.key as string])
+      .map((t) => ({
+        key: `t-${String(t.key)}`,
+        label: dict.catalog[t.labelKey],
+        remove: () => setToggles((prev) => ({ ...prev, [t.key as string]: false })),
+      })),
+    ...phase.map((ph) => ({
+      key: `ph-${ph}`,
+      label: ph === "single" ? dict.specs.phaseSingle : dict.specs.phaseThree,
+      remove: () => toggle(phase, ph, setPhase),
+    })),
+    ...mppt.map((m) => ({ key: `m-${m}`, label: `MPPT ${m}`, remove: () => toggle(mppt, m, setMppt) })),
+    ...inverterType.map((t) => ({
+      key: `it-${t}`,
+      label: t === "hybrid" ? dict.specs.typeHybrid : t === "grid" ? dict.specs.typeGrid : dict.specs.typeOffgrid,
+      remove: () => toggle(inverterType, t, setInverterType),
+    })),
+    ...(priceTouched
+      ? [
+          {
+            key: "price",
+            label: `${effectivePriceRange[0].toLocaleString("uk-UA")}–${effectivePriceRange[1].toLocaleString("uk-UA")} ₴`,
+            remove: () => {
+              setPriceTouched(false);
+              setPriceRange([priceMin, priceMax]);
+            },
+          },
+        ]
+      : []),
+  ];
 
-          <div>
-            <p className="mb-3 text-sm font-semibold">{dict.catalog.extraGroup}</p>
-            <div className="flex flex-col gap-2.5">
-              {stationToggles.map((t) => (
-                <label key={t.key} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={!!toggles[t.key as string]}
-                    onChange={() =>
-                      setToggles((prev) => ({ ...prev, [t.key as string]: !prev[t.key as string] }))
-                    }
-                    className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                  />
-                  {dict.catalog[t.labelKey]}
-                </label>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+  const sortSelect = (
+    <label className="relative inline-flex items-center">
+      <span className="sr-only">{dict.ui.sortLabel}</span>
+      <select
+        value={sort}
+        onChange={(e) => setSort(e.target.value as SortKey)}
+        className="h-10 cursor-pointer appearance-none rounded-md bg-transparent pl-3 pr-8 text-sm font-medium outline-none transition-colors hover:bg-fg/[0.05]"
+      >
+        {sortOptions.map((o) => (
+          <option key={o.key} value={o.key}>
+            {sortLabels[o.key]}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-fg-2" strokeWidth={1.5} />
+    </label>
+  );
 
-      {category === "inverters" && (
-        <>
-          {phasesAvailable.length > 0 && (
-            <div>
-              <p className="mb-3 text-sm font-semibold">{dict.catalog.phaseGroup}</p>
-              <div className="flex flex-col gap-2.5">
-                {phasesAvailable.map((ph) => (
-                  <label key={ph} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={phase.includes(ph)}
-                      onChange={() => toggle(phase, ph, setPhase)}
-                      className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                    />
-                    {ph === "single" ? dict.specs.phaseSingle : dict.specs.phaseThree}
-                  </label>
-                ))}
-              </div>
-            </div>
+  const viewToggle = (
+    <div className="flex items-center" role="group" aria-label={`${dict.ui.viewGrid} / ${dict.ui.viewList}`}>
+      {(
+        [
+          { v: "grid", icon: LayoutGrid, label: dict.ui.viewGrid },
+          { v: "list", icon: List, label: dict.ui.viewList },
+        ] as const
+      ).map(({ v, icon: Icon, label }) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => changeView(v)}
+          aria-pressed={view === v}
+          aria-label={label}
+          title={label}
+          className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-md transition-colors",
+            view === v ? "text-fg" : "text-fg-3 hover:text-fg"
           )}
-
-          {mpptAvailable.length > 0 && (
-            <div>
-              <p className="mb-3 text-sm font-semibold">{dict.catalog.mpptGroup}</p>
-              <div className="flex flex-col gap-2.5">
-                {mpptAvailable.map((m) => (
-                  <label key={m} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={mppt.includes(m)}
-                      onChange={() => toggle(mppt, m, setMppt)}
-                      className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                    />
-                    {m}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {inverterTypesAvailable.length > 0 && (
-            <div>
-              <p className="mb-3 text-sm font-semibold">{dict.catalog.typeGroup}</p>
-              <div className="flex flex-col gap-2.5">
-                {inverterTypesAvailable.map((t) => (
-                  <label key={t} className="flex cursor-pointer items-center gap-2.5 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={inverterType.includes(t)}
-                      onChange={() => toggle(inverterType, t, setInverterType)}
-                      className="h-4 w-4 rounded border-line accent-ink dark:border-line-dark dark:accent-white"
-                    />
-                    {t === "hybrid" ? dict.specs.typeHybrid : t === "grid" ? dict.specs.typeGrid : dict.specs.typeOffgrid}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        >
+          <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+        </button>
+      ))}
     </div>
   );
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[260px_1fr]">
-      <aside className="hidden lg:block">
-        <div className="sticky top-24">
-          <div className="mb-4 flex items-center justify-between">
+    <div className="grid grid-cols-1 lg:grid-cols-12 lg:gap-10">
+      <aside className="hidden lg:col-span-3 lg:block">
+        <div className="sticky top-[7.75rem] max-h-[calc(100vh-8.5rem)] overflow-y-auto pb-10 pr-1">
+          <div className="flex h-12 items-center justify-between border-y border-fg">
             <p className="text-sm font-semibold">{dict.catalog.filters}</p>
             {activeFilterCount > 0 && (
-              <button
-                onClick={resetFilters}
-                className="text-xs font-medium text-muted hover:text-ink dark:text-muted-dark dark:hover:text-ink-dark"
-              >
-                {dict.catalog.reset}
+              <button type="button" onClick={resetFilters} className="text-[13px] text-fg-2 underline-offset-4 hover:text-fg hover:underline">
+                {dict.ui.resetAll}
               </button>
             )}
           </div>
@@ -323,72 +425,52 @@ export function CatalogClient({
         </div>
       </aside>
 
-      <div>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted dark:text-muted-dark">
-            {dict.catalog.found(sorted.length)}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMobileFiltersOpen(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm font-medium lg:hidden dark:border-line-dark"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {dict.catalog.filters}
-              {activeFilterCount > 0 && (
-                <Badge tone="accent" className="ml-0.5">
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </button>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              aria-label={dict.catalog.filters}
-              className="rounded-full border border-line bg-surface px-4 py-2.5 text-sm font-medium outline-none dark:border-line-dark dark:bg-surface-dark"
-            >
-              {sortOptions.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {sortLabels[o.key]}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="min-w-0 lg:col-span-9">
+        {/* Toolbar — sticky under the header on mobile */}
+        <div className="sticky top-14 z-30 -mx-4 flex h-12 items-center gap-1 border-y border-fg bg-paper px-4 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:px-0">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="-ml-2 inline-flex h-10 items-center gap-2 rounded-md px-2 text-sm font-medium lg:hidden"
+          >
+            <SlidersHorizontal className="h-[18px] w-[18px]" strokeWidth={1.5} />
+            {dict.ui.showFilters(activeFilterCount)}
+          </button>
+          {activeFilterCount > 0 && (
+            <p className="spec hidden text-fg-2 lg:block">{dict.catalog.found(sorted.length)}</p>
+          )}
+          <span className="flex-1" />
+          {sortSelect}
+          <span className="mx-1 hidden h-5 w-px bg-rule sm:block" aria-hidden="true" />
+          <div className="hidden sm:block">{viewToggle}</div>
         </div>
 
-        {activeFilterCount > 0 && (
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            {brands.map((b) => (
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 py-4">
+            {chips.map((c) => (
               <button
-                key={b}
-                onClick={() => toggle(brands, b, setBrands)}
-                className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-3 py-1.5 text-xs font-medium dark:bg-white/10"
+                key={c.key}
+                type="button"
+                onClick={c.remove}
+                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-fg px-2.5 text-[13px] font-medium transition-colors hover:bg-fg hover:text-paper"
               >
-                {b} <X className="h-3 w-3" />
+                {c.label}
+                <X className="h-3.5 w-3.5" strokeWidth={1.75} />
               </button>
             ))}
-            {powerBucketKeys.map((k) => (
-              <button
-                key={k}
-                onClick={() => toggle(powerBucketKeys, k, setPowerBucketKeys)}
-                className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-3 py-1.5 text-xs font-medium dark:bg-white/10"
-              >
-                {powerBuckets.find((b) => b.key === k)?.label} <X className="h-3 w-3" />
-              </button>
-            ))}
-            {capacityBucketKeys.map((k) => (
-              <button
-                key={k}
-                onClick={() => toggle(capacityBucketKeys, k, setCapacityBucketKeys)}
-                className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-3 py-1.5 text-xs font-medium dark:bg-white/10"
-              >
-                {capacityBuckets.find((b) => b.key === k)?.label} <X className="h-3 w-3" />
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="ml-1 text-[13px] text-fg-2 underline-offset-4 hover:text-fg hover:underline"
+            >
+              {dict.ui.resetAll}
+            </button>
           </div>
         )}
 
-        <ProductGrid products={sorted} />
+        {activeFilterCount > 0 && <p className="spec py-3 text-fg-2 lg:hidden">{dict.catalog.found(sorted.length)}</p>}
+
+        <ProductGrid products={sorted} view={view} className={cn(chips.length === 0 && "mt-4 lg:mt-6")} />
       </div>
 
       <Sheet
@@ -396,23 +478,40 @@ export function CatalogClient({
         onClose={() => setMobileFiltersOpen(false)}
         side="bottom"
         title={dict.catalog.filters}
+        footer={
+          <div className="grid grid-cols-[auto_1fr] gap-3">
+            <Button variant="outline" size="lg" onClick={resetFilters} disabled={activeFilterCount === 0}>
+              {dict.catalog.reset}
+            </Button>
+            <Button variant="secondary" size="lg" onClick={() => setMobileFiltersOpen(false)}>
+              {dict.catalog.showResults(sorted.length)}
+            </Button>
+          </div>
+        }
       >
-        <div className={cn("p-5")}>{filtersContent}</div>
-        <div className="sticky bottom-0 flex gap-3 border-t border-line bg-surface p-4 dark:border-line-dark dark:bg-surface-dark">
-          <button
-            onClick={resetFilters}
-            className="flex-1 rounded-full border border-line py-3 text-sm font-medium dark:border-line-dark"
-          >
-            {dict.catalog.reset}
-          </button>
-          <button
-            onClick={() => setMobileFiltersOpen(false)}
-            className="flex-1 rounded-full bg-ink py-3 text-sm font-medium text-white dark:bg-white dark:text-ink"
-          >
-            {dict.catalog.showResults(sorted.length)}
-          </button>
-        </div>
+        <div className="px-5 pb-6">{filtersContent}</div>
       </Sheet>
     </div>
+  );
+}
+
+function FilterSection({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section className="border-b border-rule">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex h-12 w-full items-center justify-between text-left text-[15px] font-medium lg:text-sm"
+      >
+        {title}
+        <ChevronDown
+          className={cn("h-4 w-4 text-fg-2 transition-transform duration-200", open && "rotate-180")}
+          strokeWidth={1.5}
+        />
+      </button>
+      {open && <div className="pb-4">{children}</div>}
+    </section>
   );
 }

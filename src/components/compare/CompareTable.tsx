@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import type { BaseProduct } from "@/lib/types";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
-import { ProductVisual } from "@/components/ui/ProductVisual";
+import { ProductImage } from "@/components/ui/ProductVisual";
 import { PriceTag } from "@/components/ui/PriceTag";
 import { formatUAH } from "@/lib/utils";
 import { buildSpecs } from "@/lib/specs";
@@ -21,9 +21,9 @@ export function CompareTable({
 
   if (products.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl2 border border-dashed border-line py-16 text-center dark:border-line-dark">
-        <p className="font-medium">{dict.compare.emptyTitle}</p>
-        <p className="mt-1 text-sm text-muted dark:text-muted-dark">{dict.compare.emptyText}</p>
+      <div className="border-t border-fg py-10">
+        <p className="text-h3 font-semibold">{dict.compare.emptyTitle}</p>
+        <p className="mt-2 text-fg-2">{dict.compare.emptyText}</p>
       </div>
     );
   }
@@ -50,44 +50,47 @@ export function CompareTable({
   );
 
   return (
-    <div className="overflow-x-auto rounded-xl2 border border-line dark:border-line-dark">
-      <table className="w-full min-w-[640px] border-collapse text-sm">
+    <div className="-mx-4 overflow-x-auto sm:-mx-6 lg:mx-0">
+      <table className="w-full min-w-[640px] border-collapse text-[15px]">
         <thead>
-          <tr>
-            <th className="sticky left-0 z-10 w-40 bg-surface p-4 text-left align-bottom dark:bg-surface-dark" />
+          <tr className="border-t border-fg">
+            <th className="sticky left-0 z-10 w-44 bg-paper p-4 text-left align-bottom" />
             {products.map((p) => (
-              <th key={p.id} className="min-w-[200px] border-l border-line p-4 align-bottom dark:border-line-dark">
-                <div className="flex flex-col items-start gap-3">
-                  <button
-                    onClick={() => onRemove(p.id)}
-                    aria-label={dict.compare.remove}
-                    className="self-end rounded-full p-1 text-muted transition-colors hover:bg-black/[0.05] hover:text-ink dark:text-muted-dark dark:hover:bg-white/10 dark:hover:text-ink-dark"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                  <Link href={`/${p.category}/${p.slug}`} className="w-full">
-                    <ProductVisual category={p.category} seed={p.id} className="aspect-square w-full" compact={false} />
-                  </Link>
+              <th key={p.id} className="min-w-[220px] border-l border-rule p-4 text-left align-top font-normal">
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <Link href={`/${p.category}/${p.slug}`} className="block">
+                      <ProductImage src={p.imageUrls?.[0]} alt={p.name[locale]} category={p.category} className="aspect-[4/3] w-full" />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(p.id)}
+                      aria-label={dict.compare.remove}
+                      className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-fg-2 transition-colors hover:text-fg"
+                    >
+                      <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  </div>
                   <div>
-                    <p className="text-xs font-medium uppercase text-muted dark:text-muted-dark">{p.brand}</p>
-                    <Link href={`/${p.category}/${p.slug}`} className="text-sm font-semibold hover:underline">
+                    <p className="caption text-fg-2">{p.brand}</p>
+                    <Link href={`/${p.category}/${p.slug}`} className="mt-1 block font-medium leading-snug hover:underline">
                       {p.name[locale]}
                     </Link>
                   </div>
-                  <PriceTag price={p.price} oldPrice={p.oldPrice} size="sm" />
+                  <PriceTag price={p.price} oldPrice={p.oldPrice} />
                 </div>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
-            <tr key={row.label} className={i % 2 === 1 ? "bg-black/[0.02] dark:bg-white/[0.03]" : ""}>
-              <th className="sticky left-0 z-10 w-40 bg-inherit p-4 text-left text-sm font-medium text-muted dark:text-muted-dark">
+          {rows.map((row) => (
+            <tr key={row.label} className="border-t border-rule">
+              <th className="sticky left-0 z-10 w-44 bg-paper p-4 text-left text-sm font-normal text-fg-2">
                 {row.label}
               </th>
               {products.map((p) => (
-                <td key={p.id} className="border-l border-line p-4 text-center dark:border-line-dark">
+                <td key={p.id} className="num border-l border-rule p-4 font-medium">
                   {row.render(p)}
                 </td>
               ))}

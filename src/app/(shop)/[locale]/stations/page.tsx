@@ -42,7 +42,7 @@ export default async function StationsPage({ params }: { params: { locale: Local
   return (
     <>
       <CategoryHero category={category} count={products.length} dict={dict} />
-      <Container className="py-8 sm:py-10">
+      <Container className="pb-8">
         <CatalogClient category="stations" products={products} />
       </Container>
     </>

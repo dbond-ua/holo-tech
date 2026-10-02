@@ -100,15 +100,15 @@ export function Combobox({
             }
           }}
           className={cn(
-            "w-full rounded-xl2 border bg-transparent px-4 py-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ink dark:border-line-dark dark:focus-visible:border-white disabled:opacity-50",
-            isCommitted ? "border-volt-600 dark:border-volt" : "border-line dark:border-line-dark"
+            "h-12 w-full rounded-sm border bg-panel px-3.5 pr-9 text-[15px] outline-none transition-colors placeholder:text-fg-3 focus:border-fg disabled:opacity-50",
+            isCommitted ? "border-fg" : "border-rule"
           )}
         />
-        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted dark:text-muted-dark">
+        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-fg-2">
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : isCommitted ? (
-            <Check className="h-4 w-4 text-volt-600 dark:text-volt" />
+            <Check className="h-4 w-4 text-ok" />
           ) : (
             <ChevronDown className="h-4 w-4" />
           )}
@@ -116,9 +116,9 @@ export function Combobox({
       </div>
 
       {open && !disabled && (
-        <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-xl2 border border-line bg-surface shadow-lift dark:border-line-dark dark:bg-surface-dark">
+        <div className="anim-drop absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-sm border border-fg bg-panel shadow-overlay">
           {items.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-muted dark:text-muted-dark">
+            <p className="px-3.5 py-3 text-sm text-fg-2">
               {loading ? "…" : noResultsText}
             </p>
           ) : (
@@ -132,13 +132,13 @@ export function Combobox({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full flex-col items-start px-4 py-2.5 text-left text-sm transition-colors",
-                  i === highlighted ? "bg-black/[0.04] dark:bg-white/[0.08]" : ""
+                  "flex w-full flex-col items-start border-b border-rule px-3.5 py-2.5 text-left text-sm last:border-b-0",
+                  i === highlighted ? "bg-fg/[0.06]" : ""
                 )}
               >
                 <span className="font-medium">{item.label}</span>
                 {item.sublabel && (
-                  <span className="text-xs text-muted dark:text-muted-dark">{item.sublabel}</span>
+                  <span className="text-xs text-fg-2">{item.sublabel}</span>
                 )}
               </button>
             ))

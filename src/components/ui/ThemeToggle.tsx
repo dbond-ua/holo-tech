@@ -5,27 +5,25 @@ import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({ className, label }: { className?: string; label?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === "dark";
 
   return (
     <button
       type="button"
-      aria-label="Переключить тему"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      aria-label={isDark ? "Світла тема" : "Темна тема"}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
-        "flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-black/[0.05] dark:hover:bg-white/10",
+        "inline-flex items-center gap-1.5 text-fg-2 transition-colors hover:text-fg",
         className
       )}
     >
-      {mounted && resolvedTheme === "dark" ? (
-        <Sun className="h-5 w-5" />
-      ) : (
-        <Moon className="h-5 w-5" />
-      )}
+      {isDark ? <Sun className="h-4 w-4" strokeWidth={1.5} /> : <Moon className="h-4 w-4" strokeWidth={1.5} />}
+      {label && <span>{label}</span>}
     </button>
   );
 }

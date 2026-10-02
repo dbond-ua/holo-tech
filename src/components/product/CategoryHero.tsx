@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import type { CategorySlug } from "@/lib/types";
 import type { Dictionary } from "@/i18n/dictionary.types";
@@ -12,6 +11,7 @@ interface CategoryHeroInfo {
   emoji: string;
 }
 
+/** Compact catalog header: breadcrumbs, title with a mono count, one line of description. */
 export function CategoryHero({
   category,
   count,
@@ -22,21 +22,22 @@ export function CategoryHero({
   dict: Dictionary;
 }) {
   return (
-    <div className="border-b border-line py-8 sm:py-12 dark:border-line-dark">
+    <div className="pb-6 pt-6 sm:pb-10 sm:pt-10">
       <Container>
-        <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted dark:text-muted-dark" aria-label="Breadcrumb">
-          <Link href="/" className="transition-colors hover:text-ink dark:hover:text-ink-dark">
+        <nav className="flex items-center gap-2 text-[13px] text-fg-2" aria-label="Breadcrumb">
+          <Link href="/" className="transition-colors hover:text-fg">
             {dict.header.home}
           </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-ink dark:text-ink-dark">{category.title}</span>
+          <span className="text-fg-3" aria-hidden="true">/</span>
+          <span className="text-fg" aria-current="page">
+            {category.title}
+          </span>
         </nav>
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{category.emoji}</span>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{category.title}</h1>
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 sm:mt-6">
+          <h1 className="text-[34px] font-semibold leading-none tracking-[-0.03em] sm:text-h1">{category.title}</h1>
+          <span className="spec text-fg-2">{dict.ui.productsCount(count)}</span>
         </div>
-        <p className="mt-2 max-w-2xl text-muted dark:text-muted-dark">{category.description}</p>
-        <p className="mt-1 text-sm text-muted dark:text-muted-dark">{dict.catalog.productsCount(count)}</p>
+        <p className="mt-3 max-w-2xl text-fg-2 sm:mt-4 sm:text-lg">{category.description}</p>
       </Container>
     </div>
   );

@@ -1,98 +1,88 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, Search, Heart, ShoppingCart } from "lucide-react";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { Home, LayoutGrid, Gauge, Heart } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import { useStore } from "@/context/CartContext";
 import { useI18n } from "@/i18n/I18nProvider";
-import { SearchOverlay } from "@/components/layout/SearchOverlay";
+import { MobileNav } from "@/components/layout/MobileNav";
+import { categorySlugs } from "@/lib/data";
 import { cn } from "@/lib/utils";
+
+/**
+ * Mobile tab bar: Головна · Каталог (opens the category sheet) · Підбір ·
+ * Обране. Search and cart live in the header, so nothing is duplicated.
+ * Hidden on screens that carry their own sticky action bar (product page,
+ * cart, checkout) — see `hasOwnActionBar`.
+ */
+function hasOwnActionBar(pathname: string, locale: string): boolean {
+  const rest = pathname.replace(new RegExp(`^/${locale}`), "");
+  if (rest.startsWith("/cart") || rest.startsWith("/checkout")) return true;
+  const [, first, second] = rest.split("/");
+  return Boolean(second) && (categorySlugs as string[]).includes(first);
+}
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { cartCount, favorites } = useStore();
+  const { favorites, hydrated } = useStore();
   const { dict, locale } = useI18n();
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
-  const localeRoot = `/${locale}`;
-  const items = [
-    { href: "/", label: dict.header.home, icon: Home },
-    { href: "/stations", label: dict.header.catalog, icon: LayoutGrid },
-  ] as const;
+  if (hasOwnActionBar(pathname, locale)) return null;
+
+  const root = `/${locale}`;
+  const isHome = pathname === root;
+  const isQuiz = pathname.startsWith(`${root}/quiz`);
+  const isFav = pathname.startsWith(`${root}/favorites`);
+  const isCatalog = categorySlugs.some((c) => pathname.startsWith(`${root}/${c}`));
+
+  const item = (on: boolean) =>
+    cn(
+      "relative flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px]",
+      on ? "font-medium text-fg" : "text-fg-2"
+    );
+  const marker = (on: boolean) => on && <span className="absolute inset-x-6 top-0 h-0.5 bg-fg" />;
 
   return (
     <>
+      {/* Spacer so page content clears the fixed bar. */}
+      <div className="h-[calc(3.5rem+env(safe-area-inset-bottom))] lg:hidden" aria-hidden="true" />
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)] lg:hidden dark:border-line-dark dark:bg-surface-dark/95"
-        aria-label={dict.header.catalog}
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        aria-label={dict.header.menu}
       >
-        <div className="grid grid-cols-5">
-          {items.map((item) => {
-            const fullHref = item.href === "/" ? localeRoot : `${localeRoot}${item.href}`;
-            const active = item.href === "/" ? pathname === localeRoot : pathname.startsWith(fullHref);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
-                  active ? "text-ink dark:text-ink-dark" : "text-muted dark:text-muted-dark"
-                )}
-              >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
-                {item.label}
-              </Link>
-            );
-          })}
-
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted dark:text-muted-dark"
-          >
-            <Search className="h-5 w-5" strokeWidth={1.8} />
-            {dict.header.search}
+        <div className="grid h-14 grid-cols-4">
+          <Link href="/" className={item(isHome)}>
+            {marker(isHome)}
+            <Home className="h-5 w-5" strokeWidth={1.5} />
+            {dict.header.home}
+          </Link>
+          <button type="button" onClick={() => setCatalogOpen(true)} className={item(isCatalog)}>
+            {marker(isCatalog)}
+            <LayoutGrid className="h-5 w-5" strokeWidth={1.5} />
+            {dict.header.catalog}
           </button>
-
-          <Link
-            href="/favorites"
-            className={cn(
-              "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
-              pathname.startsWith(`${localeRoot}/favorites`) ? "text-ink dark:text-ink-dark" : "text-muted dark:text-muted-dark"
-            )}
-          >
+          <Link href="/quiz" className={item(isQuiz)}>
+            {marker(isQuiz)}
+            <Gauge className="h-5 w-5" strokeWidth={1.5} />
+            {dict.ui.tabQuiz}
+          </Link>
+          <Link href="/favorites" className={item(isFav)}>
+            {marker(isFav)}
             <span className="relative">
-              <Heart className="h-5 w-5" strokeWidth={pathname.startsWith(`${localeRoot}/favorites`) ? 2.4 : 1.8} />
-              {favorites.length > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-semibold text-white">
+              <Heart className="h-5 w-5" strokeWidth={1.5} />
+              {hydrated && favorites.length > 0 && (
+                <span className="num absolute -right-2 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-fg px-1 text-[9px] font-semibold text-paper">
                   {favorites.length}
                 </span>
               )}
             </span>
             {dict.header.favorites}
           </Link>
-
-          <Link
-            href="/cart"
-            className={cn(
-              "relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
-              pathname.startsWith(`${localeRoot}/cart`) ? "text-ink dark:text-ink-dark" : "text-muted dark:text-muted-dark"
-            )}
-          >
-            <span className="relative">
-              <ShoppingCart className="h-5 w-5" strokeWidth={pathname.startsWith(`${localeRoot}/cart`) ? 2.4 : 1.8} />
-              {cartCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </span>
-            {dict.header.cart}
-          </Link>
         </div>
       </nav>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <MobileNav open={catalogOpen} onClose={() => setCatalogOpen(false)} />
     </>
   );
 }

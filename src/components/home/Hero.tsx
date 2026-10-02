@@ -1,85 +1,116 @@
-import { ArrowRight, Zap, ShieldCheck, BatteryCharging } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import { Container } from "@/components/ui/Container";
 import { buttonVariants } from "@/components/ui/Button";
-import { ProductVisual } from "@/components/ui/ProductVisual";
+import { ProductImage } from "@/components/ui/ProductVisual";
+import { PriceTag } from "@/components/ui/PriceTag";
+import type { BaseProduct } from "@/lib/types";
 import type { Dictionary } from "@/i18n/dictionary.types";
+import type { Locale } from "@/i18n/config";
+import { productHref } from "@/lib/product-ui";
 
-export function Hero({ dict }: { dict: Dictionary }) {
+/**
+ * Hero = statement + one product on stage.
+ * Row 1: the brand line set large, the store description and the station
+ * finder link aligned to its baseline. Row 2: the featured product — photo
+ * on the stage across 8 columns, its spec plate, price and a single CTA in
+ * the remaining 4. No floating chips, no stats strip, no gradients.
+ */
+export function Hero({ dict, locale, product }: { dict: Dictionary; locale: Locale; product?: BaseProduct }) {
+  const [line1, line2] = dict.ui.heroTitle.split("\n");
+
+  const plate: { label: string; value: string; unit?: string }[] = [];
+  if (product?.capacityWh) plate.push({ label: dict.specs.capacity, value: product.capacityWh.toLocaleString("uk-UA"), unit: dict.units.wh });
+  if (product?.powerW) plate.push({ label: dict.specs.power, value: product.powerW.toLocaleString("uk-UA"), unit: dict.units.w });
+  if (product?.batteryType) plate.push({ label: dict.specs.batteryType, value: product.batteryType });
+  if (product?.weightKg) plate.push({ label: dict.specs.weight, value: String(product.weightKg), unit: dict.units.kg });
+
   return (
-    <section className="relative overflow-hidden pt-10 sm:pt-14 lg:pt-20">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px] opacity-70 dark:opacity-40"
-        style={{
-          background:
-            "radial-gradient(60% 50% at 50% 0%, rgba(37,99,255,0.12), transparent 70%)",
-        }}
-      />
+    <section className="pb-8 pt-8 sm:pb-12 sm:pt-14 lg:pt-16">
       <Container>
-        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-          <div className="animate-slide-up">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-line px-3.5 py-1.5 text-xs font-medium text-muted dark:border-line-dark dark:text-muted-dark">
-              <Zap className="h-3.5 w-3.5 text-accent" />
-              {dict.hero.badge}
-            </div>
-            <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-              {dict.hero.title}
-            </h1>
-            <p className="mt-5 max-w-lg text-balance text-lg text-muted dark:text-muted-dark">
-              {dict.hero.subtitle}
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/stations" className={buttonVariants({ size: "lg", className: "group" })}>
-                {dict.hero.ctaPrimary}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
-              <Link href="/quiz" className={buttonVariants({ variant: "outline", size: "lg" })}>
-                {dict.hero.ctaSecondary}
-              </Link>
-            </div>
-
-            <dl className="mt-12 grid grid-cols-3 gap-6 border-t border-line pt-8 dark:border-line-dark">
-              <div>
-                <dt className="text-xs text-muted dark:text-muted-dark">{dict.hero.statModels}</dt>
-                <dd className="mt-1 text-2xl font-semibold tracking-tight">40+</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted dark:text-muted-dark">{dict.hero.statBrands}</dt>
-                <dd className="mt-1 text-2xl font-semibold tracking-tight">10</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted dark:text-muted-dark">{dict.hero.statWarranty}</dt>
-                <dd className="mt-1 text-2xl font-semibold tracking-tight">{dict.hero.warrantyValue}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="relative animate-scale-in [animation-delay:120ms]">
-            <div className="relative aspect-square w-full max-w-lg justify-self-center overflow-hidden rounded-xl3 border border-line bg-gradient-to-br from-accent-50 via-white to-white shadow-lift dark:border-line-dark dark:from-accent-500/10 dark:via-surface-dark dark:to-surface-dark">
-              <ProductVisual category="stations" seed="hero-delta-pro-3" className="h-full w-full" />
-            </div>
-
-            <div className="absolute -left-4 top-6 hidden animate-fade-in rounded-2xl border border-line bg-surface/90 p-3 shadow-soft backdrop-blur sm:flex sm:items-center sm:gap-3 dark:border-line-dark dark:bg-surface-dark/90 [animation-delay:400ms]">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-volt/20 text-volt-600 dark:text-volt">
-                <BatteryCharging className="h-[18px] w-[18px]" />
-              </span>
-              <div className="pr-2">
-                <p className="text-xs text-muted dark:text-muted-dark">{dict.hero.capacityLabel}</p>
-                <p className="text-sm font-semibold">4096 {dict.units.wh}</p>
-              </div>
-            </div>
-
-            <div className="absolute -right-4 bottom-8 hidden animate-fade-in rounded-2xl border border-line bg-surface/90 p-3 shadow-soft backdrop-blur sm:flex sm:items-center sm:gap-3 dark:border-line-dark dark:bg-surface-dark/90 [animation-delay:600ms]">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-50 text-accent-600 dark:bg-accent-500/15 dark:text-accent-400">
-                <ShieldCheck className="h-[18px] w-[18px]" />
-              </span>
-              <div className="pr-2">
-                <p className="text-xs text-muted dark:text-muted-dark">{dict.hero.upsLabel}</p>
-                <p className="text-sm font-semibold">{dict.hero.upsValue}</p>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-end lg:gap-10">
+          <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.035em] sm:text-[64px] lg:col-span-9 lg:text-[80px]">
+            {line1}
+            {line2 && (
+              <>
+                <br />
+                <span className="text-fg-2">{line2}</span>
+              </>
+            )}
+          </h1>
+          <div className="lg:col-span-3 lg:pb-2">
+            <p className="max-w-sm text-base text-fg-2 sm:text-lg">{dict.ui.heroLead}</p>
+            <Link
+              href="/quiz"
+              className="mt-4 inline-flex items-center gap-2 text-[15px] font-medium underline-offset-4 hover:underline"
+            >
+              {dict.ui.heroQuiz} <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+            </Link>
           </div>
         </div>
+
+        {product && (
+          <div className="mt-10 grid grid-cols-1 border-t border-fg sm:mt-14 lg:grid-cols-12">
+            <Link
+              href={productHref(product)}
+              className="group relative -mx-4 block sm:-mx-6 lg:col-span-8 lg:mx-0"
+              aria-label={product.name[locale]}
+            >
+              <ProductImage
+                src={product.imageUrls?.[0]}
+                alt={product.name[locale]}
+                category={product.category}
+                priority
+                className="aspect-[4/3] w-full sm:aspect-[16/10]"
+                imgClassName="transition-transform duration-500 ease-snap group-hover:scale-[1.02]"
+              />
+              <p className="caption absolute left-4 top-4 text-fg-2 sm:left-6 sm:top-6">
+                {product.isNew ? `${dict.common.new} · ` : ""}
+                {dict.categories[product.category].title}
+              </p>
+            </Link>
+
+            <div className="flex flex-col pt-6 lg:col-span-4 lg:border-l lg:border-rule lg:pl-10 lg:pt-8">
+              <p className="caption text-fg-2">{product.brand}</p>
+              <h2 className="mt-2 text-[28px] font-semibold leading-[1.05] tracking-[-0.025em] sm:text-[34px]">
+                {product.name[locale].replace(new RegExp(`^${product.brand}\\s+`), "")}
+              </h2>
+              <p className="mt-3 text-fg-2">{product.tagline[locale]}</p>
+
+              {plate.length > 0 && (
+                <dl className="mt-8 grid grid-cols-2 border-t border-rule">
+                  {plate.slice(0, 4).map((row, i) => (
+                    <div
+                      key={row.label}
+                      className={`border-b border-rule py-3 ${i % 2 === 0 ? "pr-4" : "border-l pl-4"}`}
+                    >
+                      <dt className="caption text-fg-3">{row.label}</dt>
+                      <dd className="num mt-1 text-[22px] font-semibold tracking-[-0.02em]">
+                        {row.value}
+                        {row.unit && <span className="spec ml-1 font-normal text-fg-2">{row.unit}</span>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              <div className="mt-8 lg:mt-10">
+                <PriceTag price={product.price} oldPrice={product.oldPrice} size="md" />
+                <div className="mt-5 flex items-center gap-5">
+                  <Link href={productHref(product)} className={buttonVariants({ size: "lg", className: "flex-1 sm:flex-none" })}>
+                    {dict.ui.heroCta}
+                  </Link>
+                  <Link
+                    href={`/${product.category}`}
+                    className="inline-flex items-center gap-1.5 text-[15px] font-medium underline-offset-4 hover:underline"
+                  >
+                    {dict.ui.heroAll}
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Container>
     </section>
   );

@@ -50,6 +50,31 @@ const config: Config = {
         ember: {
           DEFAULT: "#ff5a1f",
         },
+        /* ---------------------------------------------------------------
+         * Storefront design system ("Паспорт пристрою").
+         * Values live in CSS variables scoped to `html.shop` (see
+         * src/app/(shop)/shop.css), so the admin panel — which shares this
+         * config and globals.css — is not affected by the storefront theme.
+         * ------------------------------------------------------------- */
+        paper: "rgb(var(--paper) / <alpha-value>)",
+        panel: "rgb(var(--panel) / <alpha-value>)",
+        stage: "rgb(var(--stage) / <alpha-value>)",
+        fg: {
+          DEFAULT: "rgb(var(--fg) / <alpha-value>)",
+          2: "rgb(var(--fg-2) / <alpha-value>)",
+          3: "rgb(var(--fg-3) / <alpha-value>)",
+        },
+        rule: {
+          DEFAULT: "rgb(var(--rule) / <alpha-value>)",
+          strong: "rgb(var(--rule-strong) / <alpha-value>)",
+        },
+        signal: {
+          DEFAULT: "rgb(var(--signal) / <alpha-value>)",
+          ink: "rgb(var(--signal-ink) / <alpha-value>)",
+          text: "rgb(var(--signal-text) / <alpha-value>)",
+        },
+        ok: "rgb(var(--ok) / <alpha-value>)",
+        warn: "rgb(var(--warn) / <alpha-value>)",
       },
       fontFamily: {
         sans: [
@@ -59,20 +84,33 @@ const config: Config = {
           "Segoe UI",
           "sans-serif",
         ],
+        mono: [
+          "var(--font-mono, ui-monospace)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
+      },
+      fontSize: {
+        /* Storefront type scale — [size, { lineHeight, letterSpacing }] */
+        caption: ["0.75rem", { lineHeight: "1.3", letterSpacing: "0.06em" }],
+        spec: ["0.8125rem", { lineHeight: "1.4", letterSpacing: "0" }],
+        h3: ["1.375rem", { lineHeight: "1.25", letterSpacing: "-0.01em" }],
+        h2: ["2.25rem", { lineHeight: "1.1", letterSpacing: "-0.02em" }],
+        h1: ["3.5rem", { lineHeight: "1", letterSpacing: "-0.03em" }],
+        display: ["5.5rem", { lineHeight: "0.95", letterSpacing: "-0.035em" }],
       },
       borderRadius: {
         xl2: "1.25rem",
         xl3: "1.75rem",
       },
       boxShadow: {
+        overlay: "0 16px 40px -16px rgb(21 21 21 / 0.28)",
         soft: "0 1px 2px rgba(12,13,15,0.04), 0 8px 24px -12px rgba(12,13,15,0.12)",
         softer: "0 1px 1px rgba(12,13,15,0.03), 0 2px 8px -2px rgba(12,13,15,0.06)",
         lift: "0 20px 50px -20px rgba(12,13,15,0.25)",
         "soft-dark": "0 1px 2px rgba(0,0,0,0.3), 0 8px 30px -10px rgba(0,0,0,0.6)",
-      },
-      maxWidth: {
-        "8xl": "90rem",
-        "9xl": "100rem",
       },
       keyframes: {
         "fade-in": {
@@ -110,6 +148,12 @@ const config: Config = {
       },
       transitionTimingFunction: {
         premium: "cubic-bezier(0.16, 1, 0.3, 1)",
+        snap: "cubic-bezier(0.25, 1, 0.5, 1)",
+      },
+      maxWidth: {
+        "8xl": "90rem",
+        "9xl": "100rem",
+        shell: "85rem",
       },
     },
   },

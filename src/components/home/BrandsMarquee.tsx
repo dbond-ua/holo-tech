@@ -1,30 +1,38 @@
 import { brandLogos } from "@/lib/data";
 import { Container } from "@/components/ui/Container";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { Dictionary } from "@/i18n/dictionary.types";
 
+/**
+ * Brands as a static index: a hairline grid of wordmarks set in the UI face.
+ * (Replaces the marquee — constant motion with no information gain.)
+ * File name kept so existing imports don't change.
+ */
 export function BrandsMarquee({ dict }: { dict: Dictionary }) {
-  const loop = [...brandLogos, ...brandLogos];
-
   return (
     <section className="py-14 sm:py-20">
       <Container>
-        <SectionHeading eyebrow={dict.home.brandsEyebrow} title={dict.home.brandsTitle} />
-      </Container>
-      <div className="relative mt-8 overflow-hidden">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-canvas to-transparent dark:from-canvas-dark sm:w-32" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-canvas to-transparent dark:from-canvas-dark sm:w-32" />
-        <div className="flex w-max animate-marquee gap-3 motion-reduce:animate-none">
-          {loop.map((b, i) => (
-            <div
-              key={`${b}-${i}`}
-              className="flex h-16 w-44 shrink-0 items-center justify-center rounded-xl2 border border-line text-sm font-semibold tracking-tight text-muted dark:border-line-dark dark:text-muted-dark sm:h-20 sm:w-56"
-            >
-              {b}
-            </div>
-          ))}
+        <div className="grid grid-cols-1 gap-6 border-t border-fg pt-4 sm:pt-5 lg:grid-cols-12">
+          <div className="lg:col-span-3">
+            <p className="caption flex gap-3 text-fg-2">
+              <span className="text-fg">06</span>
+              <span>{dict.home.brandsEyebrow}</span>
+            </p>
+            <h2 className="mt-5 text-[22px] font-semibold leading-tight tracking-[-0.015em] sm:mt-8">
+              {dict.home.brandsTitle}
+            </h2>
+          </div>
+          <ul className="grid grid-cols-2 border-l border-t border-rule sm:grid-cols-3 lg:col-span-9 lg:grid-cols-5">
+            {brandLogos.map((b) => (
+              <li
+                key={b}
+                className="flex h-16 items-center justify-center border-b border-r border-rule px-3 text-center text-[15px] font-semibold tracking-[-0.02em] text-fg-2 sm:h-20 sm:text-base"
+              >
+                {b}
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

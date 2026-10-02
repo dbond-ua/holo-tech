@@ -1,83 +1,90 @@
-import { Check, Clock, Zap, BatteryFull } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
 import { homeSolutions } from "@/lib/data";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { PriceTag } from "@/components/ui/PriceTag";
-import { buttonVariants } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
+import { formatUAH, cn } from "@/lib/utils";
 import type { Dictionary } from "@/i18n/dictionary.types";
 import type { Locale } from "@/i18n/config";
 
-const tierAccent: Record<string, string> = {
-  basic: "border-line dark:border-line-dark",
-  comfort: "border-accent-400 ring-1 ring-accent-400/40",
-  max: "border-ink dark:border-white/40",
-};
-
+/**
+ * The three autonomy tiers as a comparison table (rows = tiers), not as SaaS
+ * pricing cards. On mobile each row collapses into a compact block.
+ * The recommended tier carries a signal marker on its left edge.
+ */
 export function HomeSolutions({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+  const cols = dict.ui;
+
   return (
     <section className="py-14 sm:py-20">
       <Container>
         <SectionHeading
+          index="04"
           eyebrow={dict.home.solutionsEyebrow}
           title={dict.home.solutionsTitle}
           description={dict.home.solutionsDescription}
         />
-        <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {homeSolutions.map((s) => {
-            const tier = dict.homeSolutions.tiers[s.tier];
-            return (
-              <div
-                key={s.tier}
-                className={cn(
-                  "relative flex flex-col rounded-xl2 border bg-surface p-6 dark:bg-surface-dark",
-                  tierAccent[s.tier]
-                )}
-              >
-                {s.tier === "comfort" && (
-                  <span className="absolute -top-3 left-6 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white">
-                    {dict.homeSolutions.popularBadge}
-                  </span>
-                )}
-                <p className="text-lg font-semibold">{tier.title}</p>
-                <p className="mt-1 text-sm text-muted dark:text-muted-dark">{dict.homeSolutions.forLabel}</p>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {tier.forList.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
-                      <Check className="h-3.5 w-3.5 shrink-0 text-volt-600 dark:text-volt" /> {f}
-                    </li>
-                  ))}
-                </ul>
 
-                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-5 text-sm dark:border-line-dark">
-                  <div className="flex items-center gap-2 text-muted dark:text-muted-dark">
-                    <Zap className="h-4 w-4" /> {s.powerW} {dict.units.w}
-                  </div>
-                  <div className="flex items-center gap-2 text-muted dark:text-muted-dark">
-                    <BatteryFull className="h-4 w-4" /> {s.capacityWh} {dict.units.wh}
-                  </div>
-                  <div className="col-span-2 flex items-center gap-2 text-muted dark:text-muted-dark">
-                    <Clock className="h-4 w-4" /> {dict.homeSolutions.autonomyLabel} {s.runtimeApprox[locale]}
-                  </div>
-                </div>
+        <div className="mt-8 sm:mt-12">
+          {/* Column heads (desktop) */}
+          <div className="caption hidden grid-cols-12 gap-6 border-b border-rule pb-3 text-fg-3 lg:grid">
+            <span className="col-span-2">{cols.solutionsColTier}</span>
+            <span className="col-span-4">{cols.solutionsColFor}</span>
+            <span className="col-span-1 text-right">{cols.solutionsColPower}</span>
+            <span className="col-span-1 text-right">{cols.solutionsColCapacity}</span>
+            <span className="col-span-2">{cols.solutionsColAutonomy}</span>
+            <span className="col-span-2 text-right">{cols.solutionsColPrice}</span>
+          </div>
 
-                <div className="mt-5">
-                  <PriceTag price={s.price} size="md" />
-                </div>
-
-                <Link
-                  href="/quiz"
+          <ul className="border-t border-rule lg:border-t-0">
+            {homeSolutions.map((s) => {
+              const tier = dict.homeSolutions.tiers[s.tier];
+              const recommended = s.tier === "comfort";
+              return (
+                <li
+                  key={s.tier}
                   className={cn(
-                    buttonVariants({ variant: s.tier === "comfort" ? "primary" : "outline" }),
-                    "mt-5 w-full"
+                    "relative grid grid-cols-2 gap-x-6 gap-y-3 border-b border-rule py-5 lg:grid-cols-12 lg:items-center lg:py-6",
+                    recommended && "lg:bg-fg/[0.025]"
                   )}
                 >
-                  {dict.homeSolutions.cta}
-                </Link>
-              </div>
-            );
-          })}
+                  {recommended && <span className="absolute -left-px bottom-0 top-0 w-[3px] bg-signal" aria-hidden="true" />}
+                  <div className="col-span-2 pl-3 lg:col-span-2 lg:pl-5">
+                    <p className="text-xl font-semibold tracking-[-0.01em]">{tier.title}</p>
+                    {recommended && <p className="caption mt-1 text-signal-text">{cols.solutionsRecommended}</p>}
+                  </div>
+                  <p className="col-span-2 pl-3 text-[15px] text-fg-2 lg:col-span-4 lg:pl-0">{tier.forList.join(", ")}</p>
+                  <p className="pl-3 lg:col-span-1 lg:pl-0 lg:text-right">
+                    <span className="caption block text-fg-3 lg:hidden">{cols.solutionsColPower}</span>
+                    <span className="num text-[17px] font-medium">{s.powerW.toLocaleString("uk-UA")}</span>
+                    <span className="spec ml-1 text-fg-2">{dict.units.w}</span>
+                  </p>
+                  <p className="lg:col-span-1 lg:text-right">
+                    <span className="caption block text-fg-3 lg:hidden">{cols.solutionsColCapacity}</span>
+                    <span className="num text-[17px] font-medium">{s.capacityWh.toLocaleString("uk-UA")}</span>
+                    <span className="spec ml-1 text-fg-2">{dict.units.wh}</span>
+                  </p>
+                  <p className="col-span-2 pl-3 text-[15px] lg:col-span-2 lg:pl-0">
+                    <span className="caption mr-2 text-fg-3 lg:hidden">{cols.solutionsColAutonomy}</span>
+                    {s.runtimeApprox[locale]}
+                  </p>
+                  <div className="col-span-2 flex items-center justify-between gap-4 pl-3 lg:col-span-2 lg:justify-end lg:pl-0 lg:pr-5">
+                    <span className="num text-[22px] font-semibold tracking-[-0.02em]">{formatUAH(s.price)}</span>
+                    <Link
+                      href="/quiz"
+                      aria-label={`${dict.homeSolutions.cta}: ${tier.title}`}
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors",
+                        recommended ? "bg-signal text-signal-ink hover:bg-signal/90" : "border border-rule hover:border-fg"
+                      )}
+                    >
+                      <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </Container>
     </section>

@@ -7,7 +7,9 @@
 }
 
 @layer base {
-  * {
+  /* Admin default border color. The storefront (html.shop) sets its own
+     in src/app/(shop)/shop.css. */
+  :where(html:not(.shop)) * {
     @apply border-line dark:border-line-dark;
   }
 

@@ -42,12 +42,12 @@ export function PhoneInput({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 rounded-xl2 border bg-transparent pl-4 pr-1 transition-colors focus-within:border-ink dark:focus-within:border-white",
-        invalid ? "border-ember" : "border-line dark:border-line-dark",
+        "flex h-12 items-center gap-2 rounded-sm border bg-panel pl-3.5 pr-1 transition-colors focus-within:border-fg",
+        invalid ? "border-signal-text" : "border-rule",
         className
       )}
     >
-      <span className="select-none text-sm font-medium text-muted dark:text-muted-dark" aria-hidden>
+      <span className="num select-none text-[15px] text-fg-2" aria-hidden>
         +380
       </span>
       <input
@@ -78,7 +78,7 @@ export function PhoneInput({
           if (!/^\d$/.test(e.key)) e.preventDefault();
         }}
         onBlur={onBlur}
-        className="w-full min-w-0 bg-transparent py-3 text-sm tabular-nums outline-none"
+        className="h-full w-full min-w-0 bg-transparent text-[15px] tabular-nums outline-none placeholder:text-fg-3"
       />
     </div>
   );

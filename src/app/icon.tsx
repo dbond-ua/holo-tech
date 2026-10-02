@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
+/** Favicon: the wordmark's charge-level mark — three ink bars, one signal. */
 export default function Icon() {
   return new ImageResponse(
     (
@@ -13,16 +14,15 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0c0d0f",
-          borderRadius: "50%",
+          gap: 2,
+          background: "#151515",
+          borderRadius: 4,
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M13 2 3 14h7l-1 8 11-14h-7l1-6Z"
-            fill="#ffffff"
-          />
-        </svg>
+        <div style={{ width: 4, height: 14, background: "#f4f3ef" }} />
+        <div style={{ width: 4, height: 14, background: "#f4f3ef" }} />
+        <div style={{ width: 4, height: 14, background: "#f4f3ef" }} />
+        <div style={{ width: 4, height: 14, background: "#ff5a1f" }} />
       </div>
     ),
     { ...size }

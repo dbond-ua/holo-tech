@@ -1,0 +1,242 @@
+/*
+ * HoloTech storefront theme — "Паспорт пристрою".
+ *
+ * Scoped to <html class="shop"> (set only by the storefront layout), so the
+ * admin panel keeps its own look even though it shares globals.css and the
+ * Tailwind config. Colors are RGB channel triplets so Tailwind's
+ * `bg-fg/10`-style opacity modifiers work (see tailwind.config.ts).
+ *
+ * Plain CSS on purpose (no @layer / @apply): this file is imported after
+ * globals.css, and later rules with equal specificity win.
+ */
+
+.shop {
+  --paper: 244 243 239;       /* #F4F3EF page */
+  --panel: 255 255 255;       /* #FFFFFF inputs, popovers */
+  --stage: 233 231 225;       /* #E9E7E1 product photo backdrop */
+  --fg: 21 21 21;             /* #151515 primary text */
+  --fg-2: 85 83 78;           /* #55534E secondary text (6.9:1) */
+  --fg-3: 138 135 127;        /* #8A877F meta only, ≥14px (3.2:1) */
+  --rule: 217 214 207;        /* #D9D6CF hairlines */
+  --rule-strong: 21 21 21;
+  --signal: 255 90 31;        /* #FF5A1F primary action fill */
+  --signal-ink: 21 21 21;     /* text on signal (5.9:1) */
+  --signal-text: 184 51 0;    /* #B83300 discount text on paper (5.4:1) */
+  --ok: 31 122 68;            /* #1F7A44 in stock */
+  --warn: 154 91 0;           /* #9A5B00 low stock / on order */
+  color-scheme: light;
+}
+
+.shop.dark {
+  --paper: 18 18 17;          /* #121211 */
+  --panel: 26 26 25;          /* #1A1A19 */
+  --stage: 34 34 32;          /* #222220 */
+  --fg: 242 241 236;          /* #F2F1EC */
+  --fg-2: 168 165 157;        /* #A8A59D */
+  --fg-3: 111 108 102;        /* #6F6C66 */
+  --rule: 46 45 42;           /* #2E2D2A */
+  --rule-strong: 242 241 236;
+  --signal: 255 106 51;       /* #FF6A33 */
+  --signal-ink: 21 21 21;
+  --signal-text: 255 138 92;  /* #FF8A5C (8.1:1) */
+  --ok: 76 195 138;
+  --warn: 224 160 64;
+  color-scheme: dark;
+}
+
+/* Zero specificity so Tailwind border-color utilities always win. */
+:where(.shop) *,
+:where(.shop) ::before,
+:where(.shop) ::after {
+  border-color: rgb(var(--rule));
+}
+
+.shop body {
+  background-color: rgb(var(--paper));
+  color: rgb(var(--fg));
+  font-feature-settings: normal;
+  text-rendering: optimizeLegibility;
+}
+
+.shop ::selection {
+  background: rgb(var(--signal) / 0.28);
+  color: inherit;
+}
+
+.shop :focus-visible {
+  outline: 2px solid rgb(var(--fg));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Inverted graphite surface (footer). Fixed in both themes. */
+.shop .surface-ink {
+  --paper: 21 21 21;
+  --panel: 32 32 31;
+  --stage: 40 40 38;
+  --fg: 244 243 239;
+  --fg-2: 176 173 165;
+  --fg-3: 128 125 118;
+  --rule: 56 55 52;
+  --rule-strong: 244 243 239;
+}
+.shop.dark .surface-ink {
+  --paper: 10 10 9;
+  --rule: 42 41 39;
+}
+
+/* --- Type helpers -------------------------------------------------------- */
+
+/* Mono overline / label: brand names, section indices, units. */
+:where(.shop .caption) {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+@media (min-width: 640px) {
+  :where(.shop .caption) {
+    font-size: 0.75rem;
+  }
+}
+
+/* Technical values: "300 Вт · 245 Втг · LiFePO4". */
+:where(.shop .spec) {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+/* Prices and other figures. */
+:where(.shop .num) {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* Pages with a fixed mobile action bar reserve room for it. */
+@media (max-width: 1023px) {
+  .shop.has-action-bar body {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Loading ------------------------------------------------------------- */
+
+@keyframes hp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.shop .skeleton,
+.shop.dark .skeleton {
+  background: rgb(var(--stage));
+  animation: hp-pulse 1.4s ease-in-out infinite;
+}
+
+/* --- Motion -------------------------------------------------------------- */
+
+@keyframes hp-drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes hp-drawer-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes hp-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes hp-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes hp-drop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hp-tick {
+  0% { transform: translateY(40%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.shop .anim-drawer-right { animation: hp-drawer-in 240ms cubic-bezier(0.25, 1, 0.5, 1) both; }
+.shop .anim-drawer-left { animation: hp-drawer-in-left 240ms cubic-bezier(0.25, 1, 0.5, 1) both; }
+.shop .anim-sheet-up { animation: hp-sheet-up 260ms cubic-bezier(0.25, 1, 0.5, 1) both; }
+.shop .anim-fade { animation: hp-fade 180ms ease-out both; }
+.shop .anim-drop { animation: hp-drop 160ms ease-out both; }
+.shop .anim-tick { animation: hp-tick 220ms cubic-bezier(0.25, 1, 0.5, 1) both; }
+
+/* Hide native number/range chrome where we draw our own. */
+.shop .range-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.shop .range-thumb::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  background: transparent;
+}
+.shop .range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  height: 16px;
+  width: 16px;
+  border-radius: 2px;
+  background: rgb(var(--panel));
+  border: 2px solid rgb(var(--fg));
+  cursor: pointer;
+}
+.shop .range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 16px;
+  width: 16px;
+  border-radius: 2px;
+  background: rgb(var(--panel));
+  border: 2px solid rgb(var(--fg));
+  cursor: pointer;
+}
+
+/* Native checkboxes: square, ink fill. */
+.shop input[type="checkbox"].check {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1px solid rgb(var(--fg-3));
+  border-radius: 2px;
+  background: rgb(var(--panel));
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+.shop input[type="checkbox"].check::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 1.5px solid rgb(var(--paper));
+  border-bottom: 1.5px solid rgb(var(--paper));
+  transform: rotate(-45deg) translate(1px, -1px);
+  opacity: 0;
+}
+.shop input[type="checkbox"].check:checked {
+  background: rgb(var(--fg));
+  border-color: rgb(var(--fg));
+}
+.shop input[type="checkbox"].check:checked::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop .anim-drawer-right,
+  .shop .anim-drawer-left,
+  .shop .anim-sheet-up,
+  .shop .anim-drop,
+  .shop .anim-tick {
+    animation: hp-fade 1ms both;
+  }
+}

@@ -54,47 +54,54 @@ export default function OrderSuccessPage() {
     : "";
 
   return (
-    <Container className="flex flex-col items-center justify-center py-20 text-center sm:py-28">
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-volt/20 text-volt-600 dark:text-volt">
-        <CheckCircle2 className="h-8 w-8" />
-      </span>
-      <h1 className="mt-6 text-2xl font-semibold sm:text-3xl">{dict.success.title}</h1>
-      <p className="mt-2 max-w-md text-muted dark:text-muted-dark">
-        {dict.success.orderNumberPrefix}
-        <span className="font-semibold text-ink dark:text-ink-dark">{orderNumber}</span> {dict.success.description}
-      </p>
-
-      {loaded && order && (
-        <div className="mt-8 w-full max-w-md rounded-xl2 border border-line p-6 text-left dark:border-line-dark">
-          <div className="flex flex-col gap-2.5 border-b border-line pb-4 dark:border-line-dark">
-            {order.items.map((item, i) => (
-              <div key={i} className="flex justify-between gap-3 text-sm">
-                <span className="text-muted dark:text-muted-dark">
-                  {(locale === "uk" ? item.nameUk : item.nameEn)} × {item.qty}
-                </span>
-                <span className="shrink-0 font-medium">{formatUAH(item.price * item.qty)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between pt-4">
-            <span className="text-sm text-muted dark:text-muted-dark">{dict.success.sumLabel}</span>
-            <span className="text-lg font-semibold tracking-tight">{formatUAH(order.total)}</span>
-          </div>
-          <div className="mt-3 flex justify-between text-sm">
-            <span className="text-muted dark:text-muted-dark">{dict.success.deliveryLabel}</span>
-            <span className="text-right font-medium">
-              {deliveryLabel}
-              {order.city && <><br />{order.city}</>}
-              {order.npWarehouseName && <><br />{order.npWarehouseName}</>}
-              {order.courierAddress && <><br />{order.courierAddress}</>}
-            </span>
-          </div>
+    <Container className="pt-8 sm:pt-14">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-6">
+          <p className="caption flex items-center gap-2 text-ok">
+            <CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />
+            {dict.success.orderNumberPrefix}
+            <span className="num">{orderNumber}</span>
+          </p>
+          <h1 className="mt-4 text-[34px] font-semibold leading-[1.02] tracking-[-0.03em] sm:text-h1">
+            {dict.success.title}
+          </h1>
+          <p className="mt-4 max-w-md text-fg-2 sm:text-lg">
+            {dict.success.orderNumberPrefix}
+            <span className="num font-medium text-fg">{orderNumber}</span> {dict.success.description}
+          </p>
+          <Link href="/" className={buttonVariants({ variant: "secondary", size: "lg", className: "mt-8" })}>
+            {dict.success.backHome}
+          </Link>
         </div>
-      )}
 
-      <Link href="/" className={buttonVariants({ className: "mt-8" })}>
-        {dict.success.backHome}
-      </Link>
+        {loaded && order && (
+          <div className="border-t border-fg lg:col-span-5 lg:col-start-8">
+            <ul className="border-b border-rule">
+              {order.items.map((item, i) => (
+                <li key={i} className="flex justify-between gap-3 border-b border-rule py-3 text-[15px] last:border-b-0">
+                  <span className="text-fg-2">
+                    {locale === "uk" ? item.nameUk : item.nameEn} × {item.qty}
+                  </span>
+                  <span className="num shrink-0 font-medium">{formatUAH(item.price * item.qty)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-baseline justify-between border-b border-rule py-4">
+              <span className="font-semibold">{dict.success.sumLabel}</span>
+              <span className="num text-[28px] font-semibold tracking-[-0.02em]">{formatUAH(order.total)}</span>
+            </div>
+            <div className="flex justify-between gap-6 py-4 text-[15px]">
+              <span className="text-fg-2">{dict.success.deliveryLabel}</span>
+              <span className="text-right font-medium">
+                {deliveryLabel}
+                {order.city && <><br />{order.city}</>}
+                {order.npWarehouseName && <><br />{order.npWarehouseName}</>}
+                {order.courierAddress && <><br />{order.courierAddress}</>}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
     </Container>
   );
 }
