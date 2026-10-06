@@ -59,7 +59,12 @@ export function CatalogClient({
   const bucketLabel = (b: Bucket, unit: string) =>
     b.min === 0 ? `${dict.ui.upTo} ${b.max} ${unit}` : b.max === Infinity ? `${b.min}+ ${unit}` : `${b.min}–${b.max} ${unit}`;
 
-  const brandsAvailable = useMemo(() => Array.from(new Set(products.map((p) => p.brand))).sort(), [products]);
+  // Products without a brand (e.g. supplier imports with a blank brand) stay
+  // in the list but get no empty-named option in the brand filter.
+  const brandsAvailable = useMemo(
+    () => Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort(),
+    [products]
+  );
   const priceMin = useMemo(() => Math.min(...products.map((p) => p.price)), [products]);
   const priceMax = useMemo(() => Math.max(...products.map((p) => p.price)), [products]);
   const phasesAvailable = useMemo(
