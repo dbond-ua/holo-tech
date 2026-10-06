@@ -27,7 +27,20 @@ function Dim({ d }: { d: string }) {
   return <path d={d} {...stroke} strokeWidth={1} opacity={0.45} />;
 }
 
-const drawings: Record<CategorySlug, (compact: boolean) => ReactNode> = {
+// Generic device outline for the electronics range (no per-category art).
+function genericDevice(compact: boolean): ReactNode {
+  return (
+    <>
+      <rect x="58" y="34" width="124" height="88" rx="6" {...stroke} />
+      <rect x="68" y="44" width="104" height="62" rx="2" {...stroke} opacity={0.6} />
+      <path d="M104 122v14h32v-14M92 136h56" {...stroke} />
+      <path d="M116 114h8" {...stroke} strokeWidth={2.5} />
+      {!compact && <Dim d="M58 152h124M58 148v8M182 148v8" />}
+    </>
+  );
+}
+
+const drawings: Partial<Record<CategorySlug, (compact: boolean) => ReactNode>> = {
   stations: (compact) => (
     <>
       <rect x="62" y="62" width="116" height="78" rx="6" {...stroke} />
@@ -123,7 +136,7 @@ export function ProductVisual({
       aria-hidden="true"
     >
       <svg viewBox="0 0 240 180" className={cn("h-auto", compact ? "w-[88%]" : "w-[76%] max-w-[420px]")}>
-        {drawings[category](compact)}
+        {(drawings[category] ?? genericDevice)(compact)}
       </svg>
     </div>
   );

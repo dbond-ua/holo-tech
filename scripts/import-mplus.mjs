@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Imports products from the mplus.com.ua supplier price list (.xlsx export)
-// into the catalog at the supplier's recommended retail price (РРЦ).
+// into the catalog at the supplier's recommended retail price (РРЦ). Imports
+// everything except smartphones, tablets and phone accessories — see SECTIONS.
 //
 // Usage (on the server, from the project directory):
 //   node scripts/import-mplus.mjs /path/to/mplus.xlsx --dry-run   # preview, writes nothing
@@ -11,6 +12,14 @@
 //   --rate 41.50    UAH per USD; default: today's official NBU rate (bank.gov.ua)
 //   --markup 0      markup in percent over the РРЦ (default 0 — sell at РРЦ)
 //   --no-images     do not download product photos
+//
+// Price sanity check: the supplier list contains prices that are obviously
+// wrong (a full-frame camera at $46, a mouse at $0.20). A product priced below
+// 15% of the median price of its product type (types with 5+ products) is
+// "flagged": a NEW flagged product is imported hidden (unpublished), an
+// existing one keeps its current site price. All flagged rows are written to
+// mplus-suspicious-prices.csv next to the price list, for the supplier. When a
+// later price list fixes the price, the product is updated and published.
 //
 // Price on the site = РРЦ in USD × rate × (1 + markup/100), rounded to a whole
 // hryvnia. РРЦ is the supplier's recommended retail price; when a row has no
@@ -24,7 +33,7 @@
 // edited in the admin panel. Supplier products missing from the new file
 // are marked "out of stock" (not deleted — past orders still reference them).
 //
-// Requires migration 0011 and DATABASE_URL (read from the environment or from
+// Requires migrations 0011 and 0012 and DATABASE_URL (read from the environment or from
 // ./.env). Catalog pages are prerendered at build time, so after an import run
 // `npm run build && systemctl restart holotech` for the changes to show.
 
@@ -32,17 +41,50 @@ import { readFileSync, existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import ExcelJS from "exceljs";
+import zlib from "zlib";
+import { StringDecoder } from "string_decoder";
 import postgres from "postgres";
 
 const SUPPLIER = "mplus";
 
-// Supplier section ("Раздел") -> how to place it in our catalog. Only these
-// sections are imported; everything else in the price list is ignored.
+// Supplier section ("Раздел") -> how to place it in our catalog. A section
+// matches an entry when it equals it or starts with it + "/". The most
+// specific (longest) entry wins. Sections that match nothing — smartphones,
+// tablets, phone accessories, trade-in — are not imported.
 const SECTIONS = {
+  // Energy range (original categories)
   "Поповнюй заряд/Портативні зарядні станції": "energy",
   "Поповнюй заряд/PowerBank": "accessories",
+  "Поповнюй заряд/Елементи живлення": "accessories",
+  // Electronics range (categories from migration 0012)
+  "Фото, відео, аудіо": "audio-video",
+  "Побутова техніка": "home-appliances",
+  "Ноутбуки і компʼютерна техніка": "computers",
+  "Смарт-гаджети": "smart-gadgets",
+  "Товари для дому": "smart-gadgets",
+  "Годинники, трекери та аксесуари": "watches",
+  "Техніка Apple": "apple",
+  "ТВ, монітори, проектори": "tv-monitors",
+  "Гральна зона": "gaming",
 };
+const SECTION_KEYS = Object.keys(SECTIONS).sort((a, b) => b.length - a.length);
+
+function sectionKind(section) {
+  const key = SECTION_KEYS.find((k) => section === k || section.startsWith(`${k}/`));
+  return key ? SECTIONS[key] : null;
+}
+
+/** "Побутова техніка/Техніка для кухні/Чайники" -> section "Техніка для
+ *  кухні", type "Чайники". Two-level paths use the same value for both. The
+ *  supplier files smartwatches by brand ("Смарт-годинники/Garmin"); the
+ *  brand is already a filter, so the type stays "Смарт-годинники". */
+function groupingFor(section) {
+  const parts = section.split("/").map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return { subcategory: null, productType: null };
+  const subcategory = parts[1];
+  const productType = parts.length >= 3 && subcategory !== "Смарт-годинники" ? parts[parts.length - 1] : subcategory;
+  return { subcategory, productType };
+}
 
 // The supplier's "charging stations" section also carries inverters,
 // add-on batteries and similar gear — route those by name.
@@ -113,48 +155,162 @@ async function fetchNbuRate() {
 
 /* --- Spreadsheet --------------------------------------------------------- */
 
-function cellText(v) {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "object") {
-    if (Array.isArray(v.richText)) return v.richText.map((t) => t.text).join("").trim();
-    if (v.text !== undefined) return cellText(v.text);
-    if (v.result !== undefined) return cellText(v.result);
-    if (v instanceof Date) return v.toISOString();
-    return "";
+// A minimal .xlsx reader (an .xlsx is a zip of XML files). Written in-house
+// because exceljs's streaming reader decodes each compressed chunk to text
+// separately and corrupts Cyrillic letters that straddle a chunk boundary
+// (~2% of rows in this price list), while its non-streaming reader needs
+// ~1.5 GB of RAM for this file. This one inflates the worksheet as a stream,
+// decodes UTF-8 with a StringDecoder (boundary-safe) and parses one <row> at
+// a time, so memory stays small. Supports inline strings and the shared
+// strings table; numbers are returned as their raw text.
+
+/** Lists zip entries from the central directory: name -> {method, offset, size}. */
+function zipEntries(buf) {
+  const minEocd = Math.max(0, buf.length - 65557);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= minEocd; i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
   }
-  return String(v).trim();
+  if (eocd < 0) fail("not a valid .xlsx file (zip directory not found)");
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const entries = new Map();
+  for (let n = 0; n < count; n++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) fail("not a valid .xlsx file (corrupt zip directory)");
+    const method = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const localOffset = buf.readUInt32LE(p + 42);
+    const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
+    const lNameLen = buf.readUInt16LE(localOffset + 26);
+    const lExtraLen = buf.readUInt16LE(localOffset + 28);
+    const dataStart = localOffset + 30 + lNameLen + lExtraLen;
+    entries.set(name, { method, data: buf.subarray(dataStart, dataStart + compSize) });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
 }
 
-/** Streams the first worksheet and returns rows of the wanted sections as
- *  plain objects keyed by the header row. */
-async function readSupplierRows(file) {
-  const reader = new ExcelJS.stream.xlsx.WorkbookReader(file, {
-    sharedStrings: "cache",
-    hyperlinks: "ignore",
-    styles: "ignore",
-    worksheets: "emit",
-  });
-  const rows = [];
-  let total = 0;
-  for await (const sheet of reader) {
-    let header = null;
-    for await (const row of sheet) {
-      const values = row.values.map(cellText);
-      if (!header) {
-        header = values;
-        for (const col of ["Артикул", "Раздел", "Цена", "Валюта"]) {
-          if (!header.includes(col)) fail(`Column "${col}" not found — is this the mplus price list?`);
-        }
+/** Yields an entry's content as correctly decoded text chunks. */
+async function* entryText(entry) {
+  const decoder = new StringDecoder("utf8");
+  if (entry.method === 0) {
+    yield decoder.write(entry.data) + decoder.end();
+    return;
+  }
+  if (entry.method !== 8) fail(`unsupported compression method ${entry.method} in .xlsx`);
+  const inflate = zlib.createInflateRaw();
+  inflate.end(entry.data);
+  for await (const chunk of inflate) yield decoder.write(chunk);
+  const rest = decoder.end();
+  if (rest) yield rest;
+}
+
+const XML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+function xmlText(s) {
+  return s
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) =>
+      e[0] === "#"
+        ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1)))
+        : XML_ENTITIES[e] ?? m
+    )
+    // Excel escapes control characters as _xHHHH_
+    .replace(/_x([0-9a-f]{4})_/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/** Concatenated text of every <t> element in an XML fragment (rich text runs). */
+function joinT(fragment) {
+  let out = "";
+  for (const m of fragment.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>|<t(?:\s[^>]*)?\/>/g)) out += m[1] ?? "";
+  return xmlText(out);
+}
+
+function colIndex(letters) {
+  let n = 0;
+  for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+/** Yields each worksheet row of the first sheet as an array of cell strings. */
+async function* xlsxRows(file) {
+  const entries = zipEntries(readFileSync(file));
+  const sheetName =
+    [...entries.keys()].filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a, b) => a.localeCompare(b, "en", { numeric: true }))[0];
+  if (!sheetName) fail("no worksheet found in the .xlsx file");
+
+  const shared = [];
+  const ss = entries.get("xl/sharedStrings.xml");
+  if (ss) {
+    let xml = "";
+    for await (const t of entryText(ss)) xml += t;
+    for (const m of xml.matchAll(/<si>([\s\S]*?)<\/si>/g)) shared.push(joinT(m[1].replace(/<rPh[\s\S]*?<\/rPh>/g, "")));
+  }
+
+  let pending = "";
+  for await (const text of entryText(entries.get(sheetName))) {
+    pending += text;
+    let from = 0;
+    for (;;) {
+      const open = pending.indexOf("<row", from);
+      if (open < 0) break;
+      const selfClose = pending.indexOf("/>", open);
+      const gt = pending.indexOf(">", open);
+      if (gt < 0) break;
+      if (selfClose >= 0 && selfClose + 1 === gt) {
+        yield [];
+        from = gt + 1;
         continue;
       }
-      total++;
-      const rec = {};
-      header.forEach((h, i) => {
-        if (h) rec[h] = values[i] ?? "";
-      });
-      if (SECTIONS[rec["Раздел"]]) rows.push(rec);
+      const close = pending.indexOf("</row>", gt);
+      if (close < 0) break;
+      const body = pending.slice(gt + 1, close);
+      const cells = [];
+      for (const c of body.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const attrs = c[1];
+        const ref = attrs.match(/\br="([A-Z]+)\d+"/);
+        const type = (attrs.match(/\bt="(\w+)"/) ?? [])[1];
+        const inner = c[2] ?? "";
+        let value;
+        if (type === "inlineStr") value = joinT(inner);
+        else {
+          const v = (inner.match(/<v>([\s\S]*?)<\/v>/) ?? [])[1] ?? "";
+          value = type === "s" ? shared[Number(v)] ?? "" : xmlText(v);
+        }
+        cells[ref ? colIndex(ref[1]) : cells.length] = value.trim();
+      }
+      yield Array.from(cells, (v) => v ?? "");
+      from = close + 6;
     }
-    break; // first worksheet only
+    pending = pending.slice(from);
+  }
+}
+
+/** Reads the first worksheet and returns rows of the wanted sections as
+ *  plain objects keyed by the header row. */
+async function readSupplierRows(file) {
+  const rows = [];
+  let total = 0;
+  let header = null;
+  for await (const values of xlsxRows(file)) {
+    if (!header) {
+      header = values;
+      for (const col of ["Артикул", "Раздел", "Цена", "Валюта"]) {
+        if (!header.includes(col)) fail(`Column "${col}" not found — is this the mplus price list?`);
+      }
+      continue;
+    }
+    if (values.every((v) => !v)) continue;
+    total++;
+    const rec = {};
+    header.forEach((h, i) => {
+      if (h) rec[h] = values[i] ?? "";
+    });
+    if (sectionKind(rec["Раздел"])) rows.push(rec);
   }
   return { rows, total };
 }
@@ -333,7 +489,8 @@ function buildItems(rows, rate, markup) {
     items.push({
       sku,
       name,
-      category: categoryFor(SECTIONS[rec["Раздел"]], name),
+      category: categoryFor(sectionKind(rec["Раздел"]), name),
+      ...groupingFor(rec["Раздел"]),
       brand: brandOf(rec),
       usd,
       price: Math.round(usd * rate * (1 + markup / 100)),
@@ -346,6 +503,48 @@ function buildItems(rows, rate, markup) {
     });
   }
   return { items, skipped };
+}
+
+/* --- Price sanity check ------------------------------------------------- */
+
+const SUSPICIOUS_RATIO = 0.15;
+const MIN_GROUP = 5;
+
+function median(values) {
+  const v = [...values].sort((a, b) => a - b);
+  const mid = v.length >> 1;
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+}
+
+/** Marks items priced far below the median of their product type. */
+function flagSuspiciousPrices(items) {
+  const groups = new Map();
+  for (const it of items) {
+    const key = it.productType ?? `category:${it.category}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it.usd);
+  }
+  const medians = new Map();
+  for (const [key, prices] of groups) if (prices.length >= MIN_GROUP) medians.set(key, median(prices));
+  for (const it of items) {
+    const med = medians.get(it.productType ?? `category:${it.category}`);
+    it.typeMedianUsd = med ?? null;
+    it.flagged = med !== undefined && it.usd < med * SUSPICIOUS_RATIO;
+  }
+  return items.filter((it) => it.flagged);
+}
+
+async function writeSuspiciousCsv(file, flagged, rate) {
+  const out = path.join(path.dirname(path.resolve(file)), "mplus-suspicious-prices.csv");
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [
+    ["Артикул", "Назва", "Розділ", "Тип", "Ціна постачальника, USD", "Медіана типу, USD", "Ціна на сайті була б, грн"].map(q).join(";"),
+    ...flagged.map((it) =>
+      [it.sku, it.name, it.subcategory, it.productType, it.usd, it.typeMedianUsd?.toFixed(2), Math.round(it.usd * rate)].map(q).join(";")
+    ),
+  ];
+  await writeFile(out, "\uFEFF" + lines.join("\r\n") + "\r\n");
+  return out;
 }
 
 /* --- Images -------------------------------------------------------------- */
@@ -383,6 +582,21 @@ async function downloadImage(url, dir) {
 
 /* --- Main ---------------------------------------------------------------- */
 
+// Products processed in parallel (each may download a photo). Keeps a few
+// thousand photos to minutes instead of the better part of an hour.
+const CONCURRENCY = 4;
+
+async function runPool(list, size, fn) {
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const item = list[next++];
+      await fn(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(size, list.length) }, worker));
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   loadDotEnv();
@@ -411,6 +625,14 @@ async function main() {
   console.log(`With photos: ${items.filter((i) => i.photos.length).length}; with description: ${items.filter((i) => i.description).length}; with brand: ${items.filter((i) => i.brand).length}`);
   if (skipped.length) console.log("Skipped:\n  " + skipped.slice(0, 20).join("\n  ") + (skipped.length > 20 ? `\n  … and ${skipped.length - 20} more` : ""));
 
+  const flagged = flagSuspiciousPrices(items);
+  if (flagged.length) {
+    const csv = await writeSuspiciousCsv(opts.file, flagged, rate);
+    console.log(`\nSuspicious prices: ${flagged.length} products cost less than ${SUSPICIOUS_RATIO * 100}% of their type's median.`);
+    console.log(`New ones are imported HIDDEN; existing ones keep their current price. Full list: ${csv}`);
+    for (const it of flagged.slice(0, 10)) console.log(`  ! $${it.usd} (type median $${it.typeMedianUsd?.toFixed(0)}) ${it.name.slice(0, 70)}`);
+  }
+
   if (opts.dryRun) {
     console.log("\nSample (dry run — nothing written):");
     for (const it of items.slice(0, 25)) {
@@ -421,7 +643,7 @@ async function main() {
   }
 
   if (!process.env.DATABASE_URL) fail("DATABASE_URL is not set (and ./.env has none). Run from the project directory.");
-  const sql = postgres(process.env.DATABASE_URL, { max: 2, connect_timeout: 10, onnotice: () => {} });
+  const sql = postgres(process.env.DATABASE_URL, { max: CONCURRENCY + 1, connect_timeout: 10, onnotice: () => {} });
   const imagesDir = path.resolve(process.cwd(), process.env.PRODUCT_IMAGES_DIR || "./storage/products");
 
   try {
@@ -431,6 +653,12 @@ async function main() {
         where table_name = 'products' and column_name = 'supplier_sku'
       ) as has`;
     if (!has) fail("migration 0011 is not applied. Run: sudo -u postgres psql -d holotech -f migrations/0011_supplier_import.sql");
+    const [{ has12 }] = await sql`
+      select exists (
+        select 1 from information_schema.columns
+        where table_name = 'products' and column_name = 'product_type'
+      ) as has12`;
+    if (!has12) fail("migration 0012 is not applied. Run: sudo -u postgres psql -d holotech -f migrations/0012_electronics_categories.sql");
 
     const cats = await sql`select id, slug from categories`;
     const catId = Object.fromEntries(cats.map((c) => [c.slug, c.id]));
@@ -450,12 +678,15 @@ async function main() {
     }
 
     const [{ now: runStart }] = await sql`select now()`;
-    let created = 0, updated = 0, photos = 0, failed = 0;
+    let created = 0, updated = 0, photos = 0, failed = 0, repaired = 0;
 
-    for (const [n, it] of items.entries()) {
+    let done = 0;
+    await runPool(items, CONCURRENCY, async (it) => {
       try {
         const [existing] = await sql`
-          select id, images from products where supplier = ${SUPPLIER} and supplier_sku = ${it.sku}`;
+          select p.id, p.images, p.name_uk, p.description_uk, b.name as brand_name
+          from products p left join brands b on b.id = p.brand_id
+          where p.supplier = ${SUPPLIER} and p.supplier_sku = ${it.sku}`;
 
         let images = null;
         if (opts.images && it.photos.length && (!existing || existing.images.length === 0)) {
@@ -468,11 +699,29 @@ async function main() {
         }
 
         if (existing) {
+          // Repair text broken by the old exceljs-based reader ("�" = U+FFFD).
+          // Such text can't be an admin edit, so it is safe to replace.
+          const broken = (v) => typeof v === "string" && v.includes("\uFFFD");
+          const fixName = broken(existing.name_uk) ? it.name : null;
+          const fixDescription = broken(existing.description_uk) ? it.description : null;
+          const fixBrand = broken(existing.brand_name) ? await brandId(it.brand) : null;
+          if (fixName || fixDescription || fixBrand) repaired++;
           await sql`
             update products set
-              price = ${it.price},
+              name_uk = coalesce(${fixName}, name_uk),
+              name_en = coalesce(${fixName}, name_en),
+              description_uk = coalesce(${fixDescription}, description_uk),
+              description_en = coalesce(${fixDescription}, description_en),
+              brand_id = coalesce(${fixBrand}::uuid, brand_id),
+              -- a flagged (implausible) supplier price never replaces the site price
+              price = case when ${it.flagged} then price else ${it.price} end,
+              -- hidden only because of an earlier flag, and the price is sane now -> publish
+              is_published = case when not ${it.flagged} and supplier_price_flagged then true else is_published end,
+              supplier_price_flagged = ${it.flagged},
               in_stock = ${it.inStock},
               supplier_price_usd = ${it.usd},
+              subcategory = ${it.subcategory},
+              product_type = ${it.productType},
               supplier_synced_at = now(),
               images = case when cardinality(images) = 0 and ${images ?? []}::text[] <> '{}' then ${images ?? []}::text[] else images end,
               updated_at = now()
@@ -487,7 +736,7 @@ async function main() {
             insert into products (
               slug, category_id, brand_id, name_uk, name_en, description_uk, description_en,
               price, in_stock, power_w, capacity_wh, voltage_v, capacity_ah, battery_type, is_lifepo4, has_ups,
-              extra_specs, images, is_published,
+              extra_specs, images, is_published, supplier_price_flagged, subcategory, product_type,
               supplier, supplier_sku, supplier_price_usd, supplier_synced_at
             ) values (
               ${slug}, ${catId[it.category]}, ${await brandId(it.brand)}, ${it.name}, ${it.name},
@@ -495,7 +744,7 @@ async function main() {
               ${it.price}, ${it.inStock}, ${s.power_w ?? null}, ${s.capacity_wh ?? null},
               ${s.voltage_v ?? null}, ${s.capacity_ah ?? null},
               ${s.battery_type ?? null}, ${s.is_lifepo4 ?? null}, ${s.has_ups ?? null},
-              ${sql.json(it.extra)}, ${images ?? []}::text[], true,
+              ${sql.json(it.extra)}, ${images ?? []}::text[], ${!it.flagged}, ${it.flagged}, ${it.subcategory}, ${it.productType},
               ${SUPPLIER}, ${it.sku}, ${it.usd}, now()
             )`;
           created++;
@@ -504,8 +753,9 @@ async function main() {
         failed++;
         console.error(`  ! ${it.sku} ${it.name}: ${err.message}`);
       }
-      if ((n + 1) % 25 === 0) console.log(`  … ${n + 1}/${items.length}`);
-    }
+      done++;
+      if (done % 100 === 0) console.log(`  … ${done}/${items.length}`);
+    });
 
     // Supplier products that were not in this price list -> out of stock.
     // Skipped entirely if nothing was imported (wrong/empty file), so a bad
@@ -519,7 +769,7 @@ async function main() {
       deactivated = res.count;
     }
 
-    console.log(`\nDone. Created: ${created}; updated: ${updated}; photos downloaded: ${photos}; marked out of stock: ${deactivated}; errors: ${failed}`);
+    console.log(`\nDone. Created: ${created}; updated: ${updated} (text repaired: ${repaired}); photos downloaded: ${photos}; marked out of stock: ${deactivated}; errors: ${failed}`);
     console.log("Now rebuild so the catalog pages pick up the changes:\n  npm run build && systemctl restart holotech");
   } finally {
     await sql.end({ timeout: 5 });

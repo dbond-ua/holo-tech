@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, Search, Heart, ShoppingBag, User, ChevronDown, ArrowRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
-import { brands, categorySlugs } from "@/lib/data";
+import { brands, categorySlugs, electronicsCategorySlugs, energyCategorySlugs } from "@/lib/data";
 import type { CategorySlug } from "@/lib/types";
 import { useStore } from "@/context/CartContext";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -79,6 +79,8 @@ export function Header() {
   }, []);
 
   const categories = categorySlugs.map((slug) => ({ slug, ...dict.categories[slug] }));
+  const energy = categories.filter((c) => energyCategorySlugs.includes(c.slug));
+  const electronics = categories.filter((c) => electronicsCategorySlugs.includes(c.slug));
   const localePrefix = `/${locale}`;
   const active = categories.find((c) => pathname.startsWith(`${localePrefix}/${c.slug}`))?.slug;
   const mega = categories.find((c) => c.slug === megaCategory)!;
@@ -212,7 +214,7 @@ export function Header() {
         {/* 3 — category row (desktop) */}
         <nav className="hidden border-t border-rule lg:block" aria-label={dict.header.catalog}>
           <div className="mx-auto flex h-11 max-w-shell items-stretch gap-7 px-10">
-            {categories.map((c) => (
+            {energy.map((c) => (
               <Link
                 key={c.slug}
                 href={`/${c.slug}`}
@@ -225,6 +227,25 @@ export function Header() {
                 {active === c.slug && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-signal" />}
               </Link>
             ))}
+            {electronics.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMegaCategory(electronics.find((c) => c.slug === active)?.slug ?? electronics[0].slug);
+                  setMegaOpen(true);
+                }}
+                className={cn(
+                  "relative flex items-center gap-1 text-sm transition-colors",
+                  electronics.some((c) => c.slug === active) ? "font-medium text-fg" : "text-fg-2 hover:text-fg"
+                )}
+              >
+                {dict.ui.electronicsGroup}
+                <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {electronics.some((c) => c.slug === active) && (
+                  <span className="absolute inset-x-0 -bottom-px h-0.5 bg-signal" />
+                )}
+              </button>
+            )}
             <span className="flex-1" />
             <Link href="/quiz" className="flex items-center gap-1.5 text-sm text-fg-2 transition-colors hover:text-fg">
               {dict.footer.quizLink}
@@ -243,24 +264,36 @@ export function Header() {
             className="anim-drop absolute inset-x-0 top-full hidden border-b border-rule bg-paper shadow-overlay lg:block"
           >
             <div className="mx-auto grid max-w-shell grid-cols-12 gap-0 px-10">
-              <ul className="col-span-3 border-r border-rule py-6 pr-6">
-                {categories.map((c) => (
-                  <li key={c.slug}>
-                    <Link
-                      href={`/${c.slug}`}
-                      onMouseEnter={() => setMegaCategory(c.slug)}
-                      onFocus={() => setMegaCategory(c.slug)}
-                      className={cn(
-                        "flex items-center justify-between rounded-sm px-3 py-2.5 text-[15px] transition-colors",
-                        megaCategory === c.slug ? "bg-fg/[0.06] font-medium text-fg" : "text-fg-2 hover:text-fg"
-                      )}
-                    >
-                      {c.title}
-                      {megaCategory === c.slug && <ArrowRight className="h-4 w-4" strokeWidth={1.5} />}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <div className="col-span-3 max-h-[70vh] overflow-y-auto border-r border-rule py-6 pr-6">
+                {[
+                  { title: dict.ui.energyGroup, items: energy },
+                  { title: dict.ui.electronicsGroup, items: electronics },
+                ]
+                  .filter((g) => g.items.length > 0)
+                  .map((g, gi) => (
+                    <div key={g.title} className={gi > 0 ? "mt-5" : undefined}>
+                      <p className="caption mb-1.5 px-3 text-fg-3">{g.title}</p>
+                      <ul>
+                        {g.items.map((c) => (
+                          <li key={c.slug}>
+                            <Link
+                              href={`/${c.slug}`}
+                              onMouseEnter={() => setMegaCategory(c.slug)}
+                              onFocus={() => setMegaCategory(c.slug)}
+                              className={cn(
+                                "flex items-center justify-between rounded-sm px-3 py-2 text-[15px] transition-colors",
+                                megaCategory === c.slug ? "bg-fg/[0.06] font-medium text-fg" : "text-fg-2 hover:text-fg"
+                              )}
+                            >
+                              {c.title}
+                              {megaCategory === c.slug && <ArrowRight className="h-4 w-4" strokeWidth={1.5} />}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </div>
 
               <div className="col-span-6 grid grid-cols-2 gap-8 px-8 py-8">
                 <div>

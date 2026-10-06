@@ -4,7 +4,16 @@ export type CategorySlug =
   | "batteries"
   | "solar-panels"
   | "kits"
-  | "accessories";
+  | "accessories"
+  // Electronics range (supplier import, see scripts/import-mplus.mjs)
+  | "audio-video"
+  | "home-appliances"
+  | "computers"
+  | "smart-gadgets"
+  | "watches"
+  | "apple"
+  | "tv-monitors"
+  | "gaming";
 
 /** A string translated for every supported locale. */
 export interface Localized {
@@ -112,6 +121,10 @@ export interface BaseProduct {
   cycles?: number;
   // admin-defined, no-code-change-needed custom characteristics
   extraSpecs?: ExtraSpecEntry[];
+  /** Supplier-provided grouping inside a category, e.g. "Техніка для кухні"
+   *  (subcategory) and "Чайники" (productType). Used by the catalog filters. */
+  subcategory?: string;
+  productType?: string;
 }
 
 export interface KitProduct {
