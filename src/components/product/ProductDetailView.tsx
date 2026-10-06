@@ -214,7 +214,7 @@ export function ProductDetailView({
 
           {description && (
             <DetailSection id="description" title={dict.product.tabDescription}>
-              <p className="max-w-[68ch] text-[17px] leading-relaxed">{description}</p>
+              <p className="max-w-[68ch] whitespace-pre-line text-[17px] leading-relaxed">{description}</p>
               {features.length > 0 && (
                 <>
                   <p className="caption mt-8 text-fg-2">{dict.ui.featuresTitle}</p>
