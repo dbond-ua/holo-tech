@@ -116,6 +116,8 @@ function mapProductRow(row: ProductJoinRow, reviews: ProductReviewRow[]): BasePr
     maxCurrentA: row.max_current_a ?? undefined,
     cycles: row.cycles ?? undefined,
     extraSpecs: parseExtraSpecs(row.extra_specs),
+    subcategory: row.subcategory ?? undefined,
+    productType: row.product_type ?? undefined,
   };
 }
 
@@ -187,10 +189,12 @@ const LIST_SELECT = `
   p.is_lifepo4, p.has_ups, p.solar_charging, p.bluetooth, p.wifi, p.weight_kg,
   p.phase, p.mppt, p.inverter_type, p.voltage_v, p.capacity_ah, p.max_current_a, p.cycles,
   p.images[1:2] as images, p.gallery_frame_count, p.rating, p.reviews_count,
+  -- via to_jsonb so the query also works before migration 0012 is applied
+  (to_jsonb(p) ->> 'subcategory') as subcategory, (to_jsonb(p) ->> 'product_type') as product_type,
   c.slug as category_slug, b.name as brand_name
 `;
 
-const demoByCategory: Record<CategorySlug, BaseProduct[]> = {
+const demoByCategory: Partial<Record<CategorySlug, BaseProduct[]>> = {
   stations: demoStations,
   inverters: demoInverters,
   batteries: demoBatteries,

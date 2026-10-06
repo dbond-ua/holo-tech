@@ -55,6 +55,9 @@ export interface ProductRow {
   stock_count: number | null;
   stock_reserved: number;
   low_stock_threshold: number | null;
+  /** Supplier grouping (migration 0012); absent on databases without it. */
+  subcategory?: string | null;
+  product_type?: string | null;
   is_new: boolean;
   is_bestseller: boolean;
   is_demo: boolean;

@@ -21,7 +21,8 @@ import type {
  */
 export const IS_DEMO_DATA = true;
 
-export const categorySlugs: CategorySlug[] = [
+/** The original energy range — header category row, homepage mosaic. */
+export const energyCategorySlugs: CategorySlug[] = [
   "stations",
   "inverters",
   "batteries",
@@ -29,6 +30,21 @@ export const categorySlugs: CategorySlug[] = [
   "kits",
   "accessories",
 ];
+
+/** Electronics range added with the supplier import. Served by the generic
+ *  src/app/(shop)/[locale]/[category] routes. */
+export const electronicsCategorySlugs: CategorySlug[] = [
+  "audio-video",
+  "home-appliances",
+  "computers",
+  "smart-gadgets",
+  "watches",
+  "apple",
+  "tv-monitors",
+  "gaming",
+];
+
+export const categorySlugs: CategorySlug[] = [...energyCategorySlugs, ...electronicsCategorySlugs];
 
 export const brands = [
   { name: "EcoFlow", categories: ["stations", "solar-panels", "accessories"] },

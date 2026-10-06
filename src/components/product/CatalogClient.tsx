@@ -25,7 +25,7 @@ const stationToggles: QuickToggle[] = [
   { key: "wifi", labelKey: "wifiToggle" },
 ];
 
-type FilterGroup = "brand" | "power" | "capacity" | "toggle" | "phase" | "mppt" | "type" | "price";
+type FilterGroup = "brand" | "power" | "capacity" | "toggle" | "phase" | "mppt" | "type" | "price" | "section" | "ptype";
 const VIEW_STORAGE_KEY = "holotech:catalog-view";
 
 /**
@@ -82,6 +82,19 @@ export function CatalogClient({
     () => Array.from(new Set(products.map((p) => p.inverterType).filter(Boolean))) as string[],
     [products]
   );
+  // Supplier grouping (electronics range): "Розділ" and "Тип", most common first.
+  const byFrequency = (values: (string | undefined)[]) => {
+    const counts = new Map<string, number>();
+    for (const v of values) if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+    return Array.from(counts.keys()).sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b, "uk"));
+  };
+  const sectionsAvailable = useMemo(() => byFrequency(products.map((p) => p.subcategory)), [products]);
+  const productTypesAvailable = useMemo(() => byFrequency(products.map((p) => p.productType)), [products]);
+  // "Розділ" only adds information when it groups several types together.
+  const sectionAddsInfo = useMemo(
+    () => sectionsAvailable.length > 1 && products.some((p) => p.subcategory && p.subcategory !== p.productType),
+    [products, sectionsAvailable]
+  );
 
   const [brands, setBrands] = useState<string[]>([]);
   const [powerBucketKeys, setPowerBucketKeys] = useState<string[]>([]);
@@ -92,6 +105,8 @@ export function CatalogClient({
   const [phase, setPhase] = useState<string[]>([]);
   const [mppt, setMppt] = useState<number[]>([]);
   const [inverterType, setInverterType] = useState<string[]>([]);
+  const [sections, setSections] = useState<string[]>([]);
+  const [productTypes, setProductTypes] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("popular");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -143,6 +158,9 @@ export function CatalogClient({
     if (except !== "mppt" && mppt.length && (p.mppt === undefined || !mppt.includes(p.mppt))) return false;
     if (except !== "type" && inverterType.length && (!p.inverterType || !inverterType.includes(p.inverterType)))
       return false;
+    if (except !== "section" && sections.length && (!p.subcategory || !sections.includes(p.subcategory))) return false;
+    if (except !== "ptype" && productTypes.length && (!p.productType || !productTypes.includes(p.productType)))
+      return false;
     return true;
   }
 
@@ -173,6 +191,8 @@ export function CatalogClient({
     phase.length +
     mppt.length +
     inverterType.length +
+    sections.length +
+    productTypes.length +
     Object.values(toggles).filter(Boolean).length +
     (priceTouched ? 1 : 0);
 
@@ -186,6 +206,8 @@ export function CatalogClient({
     setPhase([]);
     setMppt([]);
     setInverterType([]);
+    setSections([]);
+    setProductTypes([]);
   }
 
   /* --- Filter UI ------------------------------------------------------- */
@@ -205,6 +227,28 @@ export function CatalogClient({
   );
 
   const groups: { key: string; title: string; content: ReactNode; show: boolean }[] = [
+    {
+      key: "section",
+      title: dict.ui.sectionGroup,
+      show: sectionAddsInfo,
+      content: sectionsAvailable.map((s) =>
+        optionRow(s, s, sections.includes(s), facet("section", (p) => p.subcategory === s), () =>
+          toggle(sections, s, setSections)
+        )
+      ),
+    },
+    {
+      key: "ptype",
+      title: dict.ui.productTypeGroup,
+      show: productTypesAvailable.length > 1,
+      // With a section picked, types from other sections are hidden rather
+      // than listed with a zero count — keeps a 40-type list usable.
+      content: productTypesAvailable.flatMap((t) => {
+        const count = facet("ptype", (p) => p.productType === t);
+        if (sections.length && count === 0 && !productTypes.includes(t)) return [];
+        return [optionRow(t, t, productTypes.includes(t), count, () => toggle(productTypes, t, setProductTypes))];
+      }),
+    },
     {
       key: "price",
       title: dict.catalog.priceGroup,
@@ -351,6 +395,8 @@ export function CatalogClient({
       remove: () => toggle(phase, ph, setPhase),
     })),
     ...mppt.map((m) => ({ key: `m-${m}`, label: `MPPT ${m}`, remove: () => toggle(mppt, m, setMppt) })),
+    ...sections.map((s) => ({ key: `sec-${s}`, label: s, remove: () => toggle(sections, s, setSections) })),
+    ...productTypes.map((t) => ({ key: `pt-${t}`, label: t, remove: () => toggle(productTypes, t, setProductTypes) })),
     ...inverterType.map((t) => ({
       key: `it-${t}`,
       label: t === "hybrid" ? dict.specs.typeHybrid : t === "grid" ? dict.specs.typeGrid : dict.specs.typeOffgrid,

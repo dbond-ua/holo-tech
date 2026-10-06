@@ -1,3 +1,5 @@
+import type { CategorySlug } from "@/lib/types";
+
 export interface Dictionary {
   meta: {
     siteName: string;
@@ -28,10 +30,7 @@ export interface Dictionary {
     home: string;
     catalog: string;
   };
-  categories: Record<
-    "stations" | "inverters" | "batteries" | "solar-panels" | "kits" | "accessories",
-    { title: string; shortTitle: string; description: string; emoji: string }
-  >;
+  categories: Record<CategorySlug, { title: string; shortTitle: string; description: string; emoji: string }>;
   search: {
     placeholder: string;
     popularCategories: string;
@@ -394,5 +393,9 @@ export interface Dictionary {
     lowStock: (n: number) => string;
     pieces: string;
     showMore: (count: number, remaining: number) => string;
+    sectionGroup: string;
+    productTypeGroup: string;
+    energyGroup: string;
+    electronicsGroup: string;
   };
 }

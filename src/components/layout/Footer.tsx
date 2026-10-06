@@ -1,20 +1,21 @@
 "use client";
 
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
-import { categorySlugs } from "@/lib/data";
+import { electronicsCategorySlugs, energyCategorySlugs } from "@/lib/data";
 import { useI18n } from "@/i18n/I18nProvider";
 import { Container } from "@/components/ui/Container";
 import { Logo } from "@/components/layout/Logo";
 
 export function Footer() {
   const { dict } = useI18n();
-  const categories = categorySlugs.map((slug) => ({ slug, ...dict.categories[slug] }));
+  const categories = energyCategorySlugs.map((slug) => ({ slug, ...dict.categories[slug] }));
+  const electronics = electronicsCategorySlugs.map((slug) => ({ slug, ...dict.categories[slug] }));
 
   return (
     <footer className="surface-ink mt-24 bg-paper text-fg sm:mt-32">
       <Container className="pb-8 pt-14 sm:pt-20">
         <div className="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-12">
-          <div className="col-span-2 lg:col-span-5">
+          <div className="col-span-2 lg:col-span-4">
             <Link href="/" aria-label="HoloTech">
               <Logo />
             </Link>
@@ -28,10 +29,23 @@ export function Footer() {
             <p className="mt-2 text-sm text-fg-2">{dict.footer.workingHours}</p>
           </div>
 
-          <div className="lg:col-span-2 lg:col-start-7">
+          <div className="lg:col-span-2 lg:col-start-5">
             <p className="caption mb-4 text-fg-3">{dict.footer.catalogTitle}</p>
             <ul className="flex flex-col gap-2.5 text-sm">
               {categories.map((c) => (
+                <li key={c.slug}>
+                  <Link href={`/${c.slug}`} className="text-fg-2 transition-colors hover:text-fg">
+                    {c.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="lg:col-span-2">
+            <p className="caption mb-4 text-fg-3">{dict.ui.electronicsGroup}</p>
+            <ul className="flex flex-col gap-2.5 text-sm">
+              {electronics.map((c) => (
                 <li key={c.slug}>
                   <Link href={`/${c.slug}`} className="text-fg-2 transition-colors hover:text-fg">
                     {c.title}

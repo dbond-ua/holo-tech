@@ -1,6 +1,6 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
-import { categorySlugs } from "@/lib/data";
+import { electronicsCategorySlugs, energyCategorySlugs } from "@/lib/data";
 import type { CategorySlug } from "@/lib/types";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -14,7 +14,10 @@ import { cn } from "@/lib/utils";
  * slim full-width row. Cells share hairline edges — one sheet, not six cards.
  */
 export function CategoryGrid({ dict, counts }: { dict: Dictionary; counts: Partial<Record<CategorySlug, number>> }) {
-  const categories = categorySlugs.map((slug, i) => ({ slug, index: i + 1, ...dict.categories[slug] }));
+  const categories = energyCategorySlugs.map((slug, i) => ({ slug, index: i + 1, ...dict.categories[slug] }));
+  const electronics = electronicsCategorySlugs
+    .map((slug) => ({ slug, ...dict.categories[slug] }))
+    .filter((c) => (counts[c.slug] ?? 0) > 0);
   const [lead, ...rest] = categories.filter((c) => c.slug !== "accessories");
   const accessories = categories.find((c) => c.slug === "accessories");
 
@@ -87,6 +90,29 @@ export function CategoryGrid({ dict, counts }: { dict: Dictionary; counts: Parti
             </Link>
           )}
         </div>
+
+        {electronics.length > 0 && (
+          <div className="mt-12 sm:mt-16">
+            <p className="caption mb-4 text-fg-2">{dict.ui.electronicsGroup}</p>
+            <ul className="grid grid-cols-2 border-l border-t border-rule sm:grid-cols-4">
+              {electronics.map((c) => (
+                <li key={c.slug} className="border-b border-r border-rule">
+                  <Link href={`/${c.slug}`} className="group flex h-full flex-col bg-paper p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-[15px] font-semibold leading-snug sm:text-base">{c.title}</h3>
+                      <ArrowUpRight
+                        className="h-4 w-4 shrink-0 text-fg-3 transition-colors group-hover:text-fg"
+                        strokeWidth={1.5}
+                      />
+                    </div>
+                    <p className="mt-1 hidden text-sm text-fg-2 sm:block">{c.description}</p>
+                    {count(c.slug) && <p className="spec mt-auto pt-3 text-fg-2">{count(c.slug)}</p>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Container>
     </section>
   );
