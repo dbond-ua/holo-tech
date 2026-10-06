@@ -475,7 +475,12 @@ export function CatalogClient({
 
         {activeFilterCount > 0 && <p className="spec py-3 text-fg-2 lg:hidden">{dict.catalog.found(sorted.length)}</p>}
 
-        <ProductGrid products={sorted} view={view} className={cn(chips.length === 0 && "mt-4 lg:mt-6")} />
+        <ProductGrid
+          products={sorted}
+          view={view}
+          pageSize={48}
+          className={cn(chips.length === 0 && "mt-4 lg:mt-6")}
+        />
       </div>
 
       <Sheet

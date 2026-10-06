@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { inverters as demoInverters } from "@/lib/data";
-import { getProductBySlug, getProductsByCategory } from "@/lib/catalog";
+import { getProductBySlug, getRelatedProducts } from "@/lib/catalog";
 import type { Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/getDictionary";
 import { SITE_URL, localeTags } from "@/i18n/config";
@@ -49,8 +49,7 @@ export default async function InverterDetailPage({ params }: { params: { locale:
     return null;
   }
 
-  const categoryProducts = await getProductsByCategory("inverters");
-  const related = categoryProducts.filter((p) => p.id !== product.id).slice(0, 4);
+  const related = await getRelatedProducts("inverters", product.id);
 
   return <ProductDetailView product={product} related={related} locale={params.locale} />;
 }

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, ArrowRight } from "lucide-react";
 import { LocalizedLink as Link } from "@/components/LocalizedLink";
-import { allProducts, categorySlugs, brandLogos } from "@/lib/data";
+import { categorySlugs, brandLogos } from "@/lib/data";
+import type { BaseProduct } from "@/lib/types";
 import { useI18n } from "@/i18n/I18nProvider";
 import { ProductImage } from "@/components/ui/ProductVisual";
 import { getSpecLine } from "@/lib/product-ui";
@@ -40,20 +41,36 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
   );
 
   const q = query.trim().toLowerCase();
-  // "2000", "2000 вт", "1024wh" — match power or capacity by number too.
-  const qNumber = Number((q.match(/\d+/) ?? [""])[0]) || null;
 
-  const productResults = useMemo(() => {
-    if (!q) return [];
-    return allProducts
-      .filter(
-        (p) =>
-          p.name[locale].toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          (qNumber !== null && (p.powerW === qNumber || p.capacityWh === qNumber))
-      )
-      .slice(0, 6);
-  }, [q, qNumber, locale]);
+  // Products are searched server-side (the whole catalog lives in the
+  // database, not in the page) — debounced, and a newer query cancels the
+  // request of an older one so results never arrive out of order.
+  const [productResults, setProductResults] = useState<BaseProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    if (!q) {
+      setProductResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        const data = res.ok ? ((await res.json()) as { products: BaseProduct[] }) : { products: [] };
+        setProductResults(data.products);
+      } catch {
+        if (!controller.signal.aborted) setProductResults([]);
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 200);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [q]);
 
   const categoryResults = useMemo(() => {
     if (!q) return [];
@@ -115,7 +132,7 @@ export function SearchOverlay({ open, onClose }: { open: boolean; onClose: () =>
               </div>
             )}
 
-            {q && !hasResults && <p className="py-8 text-fg-2">{dict.search.noResults(query)}</p>}
+            {q && !hasResults && !searching && <p className="py-8 text-fg-2">{dict.search.noResults(query)}</p>}
 
             {productResults.length > 0 && (
               <div className="mb-8">

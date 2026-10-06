@@ -446,5 +446,6 @@ export const en: Dictionary = {
     orderSummary: "Your order",
     lowStock: (n) => `Only ${n} left`,
     pieces: "pcs",
+    showMore: (count, remaining) => `Show ${count} more (${remaining} left)`,
   },
 };
