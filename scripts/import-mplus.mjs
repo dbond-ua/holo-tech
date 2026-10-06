@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Imports products from the mplus.com.ua supplier price list (.xlsx export)
-// into the catalog, with a markup on top of the supplier price.
+// into the catalog at the supplier's recommended retail price (РРЦ).
 //
 // Usage (on the server, from the project directory):
 //   node scripts/import-mplus.mjs /path/to/mplus.xlsx --dry-run   # preview, writes nothing
@@ -9,11 +9,12 @@
 // Options:
 //   --dry-run       parse and price everything, print a summary; no DB, no downloads
 //   --rate 41.50    UAH per USD; default: today's official NBU rate (bank.gov.ua)
-//   --markup 20     markup in percent over the supplier price (default 20)
+//   --markup 0      markup in percent over the РРЦ (default 0 — sell at РРЦ)
 //   --no-images     do not download product photos
 //
-// Price on the site = supplier USD price × rate × (1 + markup/100), rounded to
-// a whole hryvnia.
+// Price on the site = РРЦ in USD × rate × (1 + markup/100), rounded to a whole
+// hryvnia. РРЦ is the supplier's recommended retail price; when a row has no
+// РРЦ the "Цена" column is used instead.
 //
 // Re-running with a newer price list is the intended way to keep prices and
 // availability current: products are matched by the supplier's article
@@ -65,7 +66,7 @@ const EXTRA_BRANDS = [
 /* --- CLI ----------------------------------------------------------------- */
 
 function parseArgs(argv) {
-  const opts = { file: null, dryRun: false, rate: null, markup: 20, images: true };
+  const opts = { file: null, dryRun: false, rate: null, markup: 0, images: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") opts.dryRun = true;
@@ -75,7 +76,7 @@ function parseArgs(argv) {
     else if (!a.startsWith("--") && !opts.file) opts.file = a;
     else fail(`Unknown argument: ${a}`);
   }
-  if (!opts.file) fail("Usage: node scripts/import-mplus.mjs <file.xlsx> [--dry-run] [--rate 41.5] [--markup 20] [--no-images]");
+  if (!opts.file) fail("Usage: node scripts/import-mplus.mjs <file.xlsx> [--dry-run] [--rate 41.5] [--markup 0] [--no-images]");
   if (!existsSync(opts.file)) fail(`File not found: ${opts.file}`);
   if (opts.rate !== null && !(opts.rate > 0)) fail("--rate must be a positive number");
   if (!(opts.markup >= 0)) fail("--markup must be a number >= 0");
@@ -289,7 +290,9 @@ function buildItems(rows, rate, markup) {
   for (const rec of rows) {
     const sku = rec["Артикул"];
     const name = (rec["Название модификации (UA)"] || rec["Название (UA)"]).replace(/\s+/g, " ").trim();
-    const usd = num(rec["Цена"]);
+    // Retail price basis: РРЦ (recommended retail), falling back to "Цена".
+    const rrc = num(rec["РРЦ"] ?? "");
+    const usd = rrc > 0 ? rrc : num(rec["Цена"]);
     if (!sku || !name) {
       skipped.push(`${sku || "?"}: no article or name`);
       continue;
@@ -401,7 +404,7 @@ async function main() {
   const { items, skipped } = buildItems(rows, rate, opts.markup);
 
   console.log(`\nPrice list rows: ${total}; in imported sections: ${rows.length}; ready to import: ${items.length}; skipped: ${skipped.length}`);
-  console.log(`Rate: ${rate} UAH/USD (${rateNote}); markup: ${opts.markup}%  ->  price = USD × ${rate} × ${1 + opts.markup / 100}`);
+  console.log(`Rate: ${rate} UAH/USD (${rateNote}); markup over РРЦ: ${opts.markup}%  ->  price = РРЦ USD × ${rate}${opts.markup ? ` × ${1 + opts.markup / 100}` : ""}`);
   const byCat = {};
   for (const it of items) byCat[it.category] = (byCat[it.category] ?? 0) + 1;
   console.log("By category:", byCat);
