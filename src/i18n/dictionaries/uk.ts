@@ -454,5 +454,6 @@ export const uk: Dictionary = {
     orderSummary: "Ваше замовлення",
     lowStock: (n) => `Залишилось ${n} шт.`,
     pieces: "шт.",
+    showMore: (count, remaining) => `Показати ще ${count} (залишилось ${remaining})`,
   },
 };

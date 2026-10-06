@@ -11,18 +11,7 @@ import { HomeSolutions } from "@/components/home/HomeSolutions";
 import { KitsShowcase } from "@/components/home/KitsShowcase";
 import { BrandsMarquee } from "@/components/home/BrandsMarquee";
 import { WhyUs } from "@/components/home/WhyUs";
-import { getAllProducts, getKits, getProductBySlug } from "@/lib/catalog";
-import { categorySlugs } from "@/lib/data";
-import type { BaseProduct, CategorySlug } from "@/lib/types";
-
-/** Hero product: the newest station (most capable first), else the demo flagship. */
-async function getHeroProduct(all: BaseProduct[]): Promise<BaseProduct | undefined> {
-  const stations = all.filter((p) => p.category === "stations" && p.inStock);
-  const newest = stations
-    .filter((p) => p.isNew)
-    .sort((a, b) => (b.capacityWh ?? 0) - (a.capacityWh ?? 0))[0];
-  return newest ?? (await getProductBySlug("stations", "ecoflow-delta-pro-3")) ?? stations[0];
-}
+import { getCategoryCounts, getHeroProduct, getKits } from "@/lib/catalog";
 
 export async function generateMetadata({
   params,
@@ -56,13 +45,8 @@ export async function generateMetadata({
 export default async function HomePage({ params }: { params: { locale: Locale } }) {
   const dict = getDictionary(params.locale);
   const locale = params.locale;
-  const [all, kits] = await Promise.all([getAllProducts(), getKits()]);
-  const hero = await getHeroProduct(all);
-
-  const counts: Partial<Record<CategorySlug, number>> = {};
-  for (const slug of categorySlugs) {
-    counts[slug] = slug === "kits" ? kits.length : all.filter((p) => p.category === slug).length;
-  }
+  const [counts, kits, hero] = await Promise.all([getCategoryCounts(), getKits(), getHeroProduct()]);
+  counts.kits = kits.length;
 
   return (
     <>

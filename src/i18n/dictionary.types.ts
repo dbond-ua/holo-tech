@@ -393,5 +393,6 @@ export interface Dictionary {
     orderSummary: string;
     lowStock: (n: number) => string;
     pieces: string;
+    showMore: (count: number, remaining: number) => string;
   };
 }

@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
-import { categorySlugs, allProducts, kits } from "@/lib/data";
+import { categorySlugs, kits } from "@/lib/data";
+import { getSitemapProducts } from "@/lib/catalog";
 import { locales, SITE_URL } from "@/i18n/config";
 import { localePath } from "@/i18n/localePath";
 
 const STATIC_PATHS = ["", "/compare", "/quiz", "/cart", "/checkout", "/favorites", "/profile"];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// Product URLs come from the database (every published product, including
+// supplier imports), so the sitemap is regenerated on every build.
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   const alternates = (path: string) =>
@@ -31,12 +34,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     }
   }
 
-  for (const p of allProducts) {
+  for (const p of await getSitemapProducts()) {
     const path = `/${p.category}/${p.slug}`;
     for (const locale of locales) {
       entries.push({
         url: `${SITE_URL}${localePath(locale, path)}`,
-        lastModified: new Date(),
+        lastModified: p.updatedAt,
         alternates: { languages: alternates(path) },
       });
     }
